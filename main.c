@@ -195,6 +195,12 @@ static void
 world_destroy(struct World *w);
 
 /**
+ * Add a projectile into the world.
+ */
+static void
+world_add_projectile(struct World *w, const struct Projectile *projectile);
+
+/**
  * Update the world by given delta time.
  */
 static int
