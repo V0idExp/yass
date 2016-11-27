@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "memory.h"
+#include "sprite.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
@@ -27,6 +28,7 @@ struct Player {
 	float x, y;     // position
 	int move_dirs;  // movement directions bitfield
 	float speed;    // speed in units/second
+	struct Sprite *sprite;
 };
 
 /**
@@ -184,6 +186,16 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	return 1;
 }
 
+static int
+render(struct SDL_Window *win, struct World *w)
+{
+	// TODO: bind shader
+	// TODO: update shader uniforms
+	// TODO: render
+	SDL_GL_SwapWindow(win);
+	return 1;
+}
+
 struct World*
 world_new(void)
 {
@@ -193,15 +205,24 @@ world_new(void)
 	}
 
 	// initialize player
+	w->player.sprite = sprite_from_file("data/playerShip1_blue.png");
+	if (!w->player.sprite) {
+		goto error;
+	}
 	w->player.speed = PLAYER_INITIAL_SPEED;
 
 	return w;
+
+error:
+	world_destroy(w);
+	return NULL;
 }
 
 static void
 world_destroy(struct World *w)
 {
 	if (w) {
+		sprite_destroy(w->player.sprite);
 		free(w);
 	}
 }
@@ -242,7 +263,7 @@ int main(int argc, char *argv[])
 
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
-	while (run) {
+	while (ok && run) {
 		// handle input
 		SDL_Event evt;
 		while (SDL_PollEvent(&evt)) {
@@ -263,6 +284,9 @@ int main(int argc, char *argv[])
 		float dt = (now - last_update) / 1000.0f;
 		last_update = now;
 		run &= world_update(world, dt);
+
+		// render!
+		ok &= render(win, world);
 	}
 
 cleanup:
