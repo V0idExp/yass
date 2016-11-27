@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "matlib.h"
 #include "memory.h"
+#include "shader.h"
 #include "sprite.h"
 
 #define SCREEN_WIDTH 800
@@ -41,16 +43,33 @@ struct World {
 };
 
 /**
+ * Rendering pipeline.
+ */
+struct Pipeline {
+	Mat projection;
+	struct Shader *shader;
+	struct ShaderUniform u_texture;
+	struct ShaderUniform u_size;
+	struct ShaderUniform u_transform;
+};
+
+/**
  * Initializes SDL and various subsystems.
  */
 static int
-init(unsigned width, unsigned height, SDL_Window **win, SDL_GLContext **ctx);
+init(
+	unsigned width,
+	unsigned height,
+	SDL_Window **win,
+	SDL_GLContext **ctx,
+	struct Pipeline *pipeline
+);
 
 /**
  * Cleans-up and shuts down everything.
  */
 static void
-shutdown(SDL_Window *win, SDL_GLContext *ctx);
+shutdown(SDL_Window *win, SDL_GLContext *ctx, struct Pipeline *pipeline);
 
 /**
  * Keyboard events handler callback.
@@ -81,7 +100,8 @@ init(
 	unsigned width,
 	unsigned height,
 	SDL_Window **win,
-	SDL_GLContext **ctx
+	SDL_GLContext **ctx,
+	struct Pipeline *pipeline
 ) {
 	assert(win);
 	assert(ctx);
@@ -136,16 +156,65 @@ init(
 	printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("GLEW version: %s\n", glewGetString(GLEW_VERSION));
 
+	// initialize OpenGL state machine
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	// initialize pipeline
+	memset(pipeline, 0, sizeof(struct Pipeline));
+
+	// initialize projection matrix
+	mat_ortho(
+		&pipeline->projection,
+		-(float)width / 2,
+		(float)width / 2,
+		(float)height / 2,
+		-(float)height / 2,
+		0,
+		100
+	);
+
+	// load and compile the shader
+	const char *uniform_names[] = {
+		"tex",
+		"size",
+		"transform",
+		NULL
+	};
+	struct ShaderUniform *uniforms[] = {
+		&pipeline->u_texture,
+		&pipeline->u_size,
+		&pipeline->u_transform,
+		NULL
+	};
+	pipeline->shader = shader_compile(
+		"data/rect.vert",
+		"data/rect.frag",
+		uniform_names,
+		uniforms,
+		NULL,
+		NULL
+	);
+	if (!pipeline->shader || !shader_bind(pipeline->shader)) {
+		fprintf(
+			stderr,
+			"failed to initialize rendering pipeline\n"
+		);
+		goto error;
+	}
+
 	return 1;
 
 error:
-	shutdown(*win, *ctx);
+	shutdown(*win, *ctx, pipeline);
 	return 0;
 }
 
 static void
-shutdown(SDL_Window *win, SDL_GLContext *ctx)
+shutdown(SDL_Window *win, SDL_GLContext *ctx, struct Pipeline *pipeline)
 {
+	shader_free(pipeline->shader);
+
 	if (ctx) {
 		SDL_GL_DeleteContext(ctx);
 	}
@@ -187,13 +256,55 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 }
 
 static int
-render(struct SDL_Window *win, struct World *w)
+render(struct SDL_Window *win, struct Pipeline *pipeline, struct World *world)
 {
-	// TODO: bind shader
-	// TODO: update shader uniforms
-	// TODO: render
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	int ok = 1;
+
+	Vec size = vec(
+		world->player.sprite->width,
+		world->player.sprite->height,
+		0,
+		0
+	);
+	ok &= shader_uniform_set(
+		&pipeline->u_size,
+		1,
+		&size
+	);
+
+	Mat transform, mvp;
+	mat_ident(&transform);
+	mat_translate(
+		&transform,
+		world->player.x - world->player.sprite->width / 2,
+		world->player.y - world->player.sprite->height / 2,
+		0
+	);
+	mat_mul(&pipeline->projection, &transform, &mvp);
+	ok &= shader_uniform_set(
+		&pipeline->u_transform,
+		1,
+		&mvp
+	);
+
+	GLuint texture_unit = 0;
+	glActiveTexture(GL_TEXTURE0 + texture_unit);
+	glBindTexture(GL_TEXTURE_RECTANGLE, world->player.sprite->texture);
+	ok &= glGetError() == GL_NO_ERROR;
+	ok &= shader_uniform_set(
+		&pipeline->u_texture,
+		1,
+		&texture_unit
+	);
+
+	glBindVertexArray(world->player.sprite->vao);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	ok &= glGetError() == GL_NO_ERROR;
+
 	SDL_GL_SwapWindow(win);
-	return 1;
+	return ok;
 }
 
 struct World*
@@ -245,11 +356,13 @@ world_update(struct World *world, float dt)
 	return 1;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
+	struct Pipeline pipeline;
 	SDL_Window *win = NULL;
 	SDL_GLContext *ctx = NULL;
-	if (!init(SCREEN_WIDTH, SCREEN_HEIGHT, &win, &ctx)) {
+	if (!init(SCREEN_WIDTH, SCREEN_HEIGHT, &win, &ctx, &pipeline)) {
 		return EXIT_FAILURE;
 	}
 
@@ -286,11 +399,11 @@ int main(int argc, char *argv[])
 		run &= world_update(world, dt);
 
 		// render!
-		ok &= render(win, world);
+		ok &= render(win, &pipeline, world);
 	}
 
 cleanup:
 	world_destroy(world);
-	shutdown(win, ctx);
+	shutdown(win, ctx, &pipeline);
 	return !(ok == 1);
 }
