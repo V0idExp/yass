@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "memory.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
@@ -36,17 +37,6 @@ struct Player {
 struct World {
 	struct Player player;
 };
-
-/**
- * Allocates given amount of bytes and zeroes it.
- */
-static void*
-alloc0(size_t size);
-
-/**
- * Allocates given type and initializes it to 0.
- */
-#define make(t) (alloc0(sizeof(t)))
 
 /**
  * Initializes SDL and various subsystems.
@@ -83,17 +73,6 @@ world_destroy(struct World *w);
  */
 static int
 world_update(struct World *world, float dt);
-
-static void*
-alloc0(size_t size)
-{
-	void *bytes = malloc(size);
-	if (!size) {
-		return NULL;
-	}
-	memset(bytes, 0, size);
-	return bytes;
-}
 
 static int
 init(
