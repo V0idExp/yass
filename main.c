@@ -209,7 +209,7 @@ renderer_init(struct Renderer *rndr, unsigned width, unsigned height) {
 
 	// initialize OpenGL state machine
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// initialize pipeline
 	memset(&rndr->pipeline, 0, sizeof(struct Pipeline));
