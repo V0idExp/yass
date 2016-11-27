@@ -99,7 +99,8 @@ render_list_add_sprite(
 	struct RenderList *list,
 	const struct Sprite *spr,
 	float x,
-	float y
+	float y,
+	float angle
 );
 
 /**
@@ -310,15 +311,23 @@ render_list_add_sprite(
 	struct RenderList *list,
 	const struct Sprite *spr,
 	float x,
-	float y
+	float y,
+	float angle
 ) {
 	assert(list->len < RENDER_LIST_MAX_LEN);
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->vao = spr->vao;
 	node->texture = spr->texture;
 	node->size = vec(spr->width, spr->height, 0, 0);
-	mat_ident(&node->transform);
-	mat_translate(&node->transform, x, -y, 0);
+	Mat t, r;
+	mat_ident(&t);
+	mat_translate(&t, x, -y, 0);
+
+	mat_ident(&r);
+	mat_translate(&r, -spr->width / 2, spr->height / 2, 0);
+	mat_rotate(&r, 0, 0, 1, angle);
+
+	mat_mul(&t, &r, &node->transform);
 }
 
 static int
@@ -397,6 +406,7 @@ world_new(void)
 		ast->xvel = ((random() % 2) ? -1 : 1) * (random() % 25);
 		ast->yvel = ((random() % 2) ? -1 : 1) * (random() % 25);
 		ast->sprite = ast_spr;
+		ast->rot_speed = ((random() % 2) ? -1 : 1) * 2.0 * M_PI / (2 + random() % 6);
 	}
 
 	return w;
@@ -439,6 +449,10 @@ world_update(struct World *world, float dt)
 		struct Asteroid *ast = &world->asteroids[i];
 		ast->x += ast->xvel * dt;
 		ast->y += ast->yvel * dt;
+		ast->rot += ast->rot_speed * dt;
+		if (ast->rot >= M_PI * 2) {
+			ast->rot -= M_PI * 2;
+		}
 	}
 
 	return 1;
@@ -450,8 +464,9 @@ world_render(struct World *world, struct RenderList *rndr_list)
 	render_list_add_sprite(
 		rndr_list,
 		world->player.sprite,
-		world->player.x - world->player.sprite->width / 2,
-		world->player.y
+		world->player.x,
+		world->player.y,
+		0.0f
 	);
 
 	for (int i = 0; i < MAX_ASTEROIDS; i++) {
@@ -459,7 +474,8 @@ world_render(struct World *world, struct RenderList *rndr_list)
 			rndr_list,
 			world->asteroids[i].sprite,
 			world->asteroids[i].x,
-			world->asteroids[i].y
+			world->asteroids[i].y,
+			world->asteroids[i].rot
 		);
 	}
 
