@@ -11,6 +11,8 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
+#define RENDER_LIST_MAX_LEN 1000
+#define MAX_ASTEROIDS 5
 #define PLAYER_INITIAL_SPEED 100.0  // units/second
 
 /**
@@ -34,12 +36,42 @@ struct Player {
 };
 
 /**
+ * Asteroid.
+ */
+struct Asteroid {
+	float x, y;
+	float xvel, yvel;
+	float rot;
+	float rot_speed;
+	struct Sprite *sprite;
+};
+
+/**
  * World container.
  *
  * This struct holds all the objects which make up the game.
  */
 struct World {
 	struct Player player;
+	struct Asteroid asteroids[MAX_ASTEROIDS];
+};
+
+/**
+ * Render node.
+ */
+struct RenderNode {
+	GLuint vao;
+	GLuint texture;
+	Vec size;
+	Mat transform;
+};
+
+/**
+ * Render list.
+ */
+struct RenderList {
+	struct RenderNode nodes[RENDER_LIST_MAX_LEN];
+	size_t len;
 };
 
 /**
@@ -53,23 +85,40 @@ struct Pipeline {
 	struct ShaderUniform u_transform;
 };
 
+struct Renderer {
+	SDL_Window *win;
+	SDL_GLContext *ctx;
+	struct Pipeline pipeline;
+};
+
 /**
- * Initializes SDL and various subsystems.
+ * Adds the given sprite to the render list.
+ */
+static void
+render_list_add_sprite(
+	struct RenderList *list,
+	const struct Sprite *spr,
+	float x,
+	float y
+);
+
+/**
+ * Execute a render list.
  */
 static int
-init(
-	unsigned width,
-	unsigned height,
-	SDL_Window **win,
-	SDL_GLContext **ctx,
-	struct Pipeline *pipeline
-);
+render_list_exec(struct RenderList *list, struct Renderer *rndr);
+
+/**
+ * Initializes renderer and various subsystems.
+ */
+static int
+renderer_init(struct Renderer *rndr, unsigned width, unsigned height);
 
 /**
  * Cleans-up and shuts down everything.
  */
 static void
-shutdown(SDL_Window *win, SDL_GLContext *ctx, struct Pipeline *pipeline);
+renderer_shutdown(struct Renderer *rndr);
 
 /**
  * Keyboard events handler callback.
@@ -95,19 +144,20 @@ world_destroy(struct World *w);
 static int
 world_update(struct World *world, float dt);
 
+/**
+ * Renders the world.
+ */
 static int
-init(
-	unsigned width,
-	unsigned height,
-	SDL_Window **win,
-	SDL_GLContext **ctx,
-	struct Pipeline *pipeline
-) {
-	assert(win);
-	assert(ctx);
-	*win = NULL;
-	*ctx = NULL;
+world_render(struct World *world, struct RenderList *rndr_list);
 
+/**
+ * Add a render node to render queue.
+ */
+void
+pipeline_add_node(struct Pipeline *pipelne, const struct RenderNode *node);
+
+static int
+renderer_init(struct Renderer *rndr, unsigned width, unsigned height) {
 	// initialize SDL video subsystem
 	if (!SDL_WasInit(SDL_INIT_VIDEO) && SDL_Init(SDL_INIT_VIDEO) != 0) {
 		fprintf(stderr, "failed to initialize SDL: %s", SDL_GetError());
@@ -115,7 +165,7 @@ init(
 	}
 
 	// create window
-	*win = SDL_CreateWindow(
+	rndr->win = SDL_CreateWindow(
 		"Shooter",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
@@ -123,7 +173,7 @@ init(
 		height,
 		SDL_WINDOW_OPENGL
 	);
-	if (!*win) {
+	if (!rndr->win) {
 		fprintf(stderr, "failed to create OpenGL window\n");
 		goto error;
 	}
@@ -138,8 +188,8 @@ init(
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-	*ctx = SDL_GL_CreateContext(*win);
-	if (!*ctx) {
+	rndr->ctx = SDL_GL_CreateContext(rndr->win);
+	if (!rndr->ctx) {
 		fprintf(stderr, "failed to initialize OpenGL context\n");
 		goto error;
 	}
@@ -161,11 +211,11 @@ init(
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	// initialize pipeline
-	memset(pipeline, 0, sizeof(struct Pipeline));
+	memset(&rndr->pipeline, 0, sizeof(struct Pipeline));
 
 	// initialize projection matrix
 	mat_ortho(
-		&pipeline->projection,
+		&rndr->pipeline.projection,
 		-(float)width / 2,
 		(float)width / 2,
 		(float)height / 2,
@@ -182,12 +232,12 @@ init(
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
-		&pipeline->u_texture,
-		&pipeline->u_size,
-		&pipeline->u_transform,
+		&rndr->pipeline.u_texture,
+		&rndr->pipeline.u_size,
+		&rndr->pipeline.u_transform,
 		NULL
 	};
-	pipeline->shader = shader_compile(
+	rndr->pipeline.shader = shader_compile(
 		"data/rect.vert",
 		"data/rect.frag",
 		uniform_names,
@@ -195,7 +245,7 @@ init(
 		NULL,
 		NULL
 	);
-	if (!pipeline->shader || !shader_bind(pipeline->shader)) {
+	if (!rndr->pipeline.shader || !shader_bind(rndr->pipeline.shader)) {
 		fprintf(
 			stderr,
 			"failed to initialize rendering pipeline\n"
@@ -206,20 +256,20 @@ init(
 	return 1;
 
 error:
-	shutdown(*win, *ctx, pipeline);
+	renderer_shutdown(rndr);
 	return 0;
 }
 
 static void
-shutdown(SDL_Window *win, SDL_GLContext *ctx, struct Pipeline *pipeline)
+renderer_shutdown(struct Renderer *rndr)
 {
-	shader_free(pipeline->shader);
+	shader_free(rndr->pipeline.shader);
 
-	if (ctx) {
-		SDL_GL_DeleteContext(ctx);
+	if (rndr->ctx) {
+		SDL_GL_DeleteContext(rndr->ctx);
 	}
-	if (win) {
-		SDL_DestroyWindow(win);
+	if (rndr->win) {
+		SDL_DestroyWindow(rndr->win);
 	}
 }
 
@@ -255,55 +305,68 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	return 1;
 }
 
+static void
+render_list_add_sprite(
+	struct RenderList *list,
+	const struct Sprite *spr,
+	float x,
+	float y
+) {
+	assert(list->len < RENDER_LIST_MAX_LEN);
+	struct RenderNode *node = &list->nodes[list->len++];
+	node->vao = spr->vao;
+	node->texture = spr->texture;
+	node->size = vec(spr->width, spr->height, 0, 0);
+	mat_ident(&node->transform);
+	mat_translate(&node->transform, x, -y, 0);
+}
+
 static int
-render(struct SDL_Window *win, struct Pipeline *pipeline, struct World *world)
+render_list_exec(struct RenderList *list, struct Renderer *rndr)
 {
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	int ok = 1;
-
-	Vec size = vec(
-		world->player.sprite->width,
-		world->player.sprite->height,
-		0,
-		0
-	);
-	ok &= shader_uniform_set(
-		&pipeline->u_size,
-		1,
-		&size
-	);
-
-	Mat transform, mvp;
-	mat_ident(&transform);
-	mat_translate(
-		&transform,
-		world->player.x - world->player.sprite->width / 2,
-		-world->player.y + world->player.sprite->height / 2,
-		0
-	);
-	mat_mul(&pipeline->projection, &transform, &mvp);
-	ok &= shader_uniform_set(
-		&pipeline->u_transform,
-		1,
-		&mvp
-	);
-
+	Mat mvp;
 	GLuint texture_unit = 0;
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
-	glBindTexture(GL_TEXTURE_RECTANGLE, world->player.sprite->texture);
-	ok &= glGetError() == GL_NO_ERROR;
-	ok &= shader_uniform_set(
-		&pipeline->u_texture,
-		1,
-		&texture_unit
-	);
 
-	glBindVertexArray(world->player.sprite->vao);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	ok &= glGetError() == GL_NO_ERROR;
+	int ok = 1;
+	for (size_t i = 0; i < list->len; i++) {
+		struct RenderNode *node = &list->nodes[i];
 
-	SDL_GL_SwapWindow(win);
+		// configure size
+		ok &= shader_uniform_set(
+			&rndr->pipeline.u_size,
+			1,
+			&node->size
+		);
+
+		// configure transform
+		mat_mul(&rndr->pipeline.projection, &node->transform, &mvp);
+		ok &= shader_uniform_set(
+			&rndr->pipeline.u_transform,
+			1,
+			&mvp
+		);
+
+		// configure texture sampler
+		ok &= shader_uniform_set(
+			&rndr->pipeline.u_texture,
+			1,
+			&texture_unit
+		);
+
+		// render
+		glBindTexture(GL_TEXTURE_RECTANGLE, node->texture);
+		glBindVertexArray(node->vao);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		ok &= glGetError() == GL_NO_ERROR;
+
+		if (!ok) {
+			break;
+		}
+	}
+
+	list->len = 0;
+
 	return ok;
 }
 
@@ -322,6 +385,20 @@ world_new(void)
 	}
 	w->player.speed = PLAYER_INITIAL_SPEED;
 
+	// initialize asteroids
+	struct Sprite *ast_spr = sprite_from_file("data/meteorGrey_small2.png");
+	if (!ast_spr) {
+		goto error;
+	}
+	for (int i = 0; i < MAX_ASTEROIDS; i++) {
+		struct Asteroid *ast = &w->asteroids[i];
+		ast->x = -SCREEN_WIDTH / 2 + random() % SCREEN_WIDTH / 2;
+		ast->y = -SCREEN_HEIGHT / 2 + random() % SCREEN_HEIGHT / 2;
+		ast->xvel = ((random() % 2) ? -1 : 1) * (random() % 25);
+		ast->yvel = ((random() % 2) ? -1 : 1) * (random() % 25);
+		ast->sprite = ast_spr;
+	}
+
 	return w;
 
 error:
@@ -334,6 +411,7 @@ world_destroy(struct World *w)
 {
 	if (w) {
 		sprite_destroy(w->player.sprite);
+		sprite_destroy(w->asteroids[0].sprite);
 		free(w);
 	}
 }
@@ -356,16 +434,44 @@ world_update(struct World *world, float dt)
 		world->player.y += distance;
 	}
 
+	// update asteroids
+	for (int i = 0; i < MAX_ASTEROIDS; i++) {
+		struct Asteroid *ast = &world->asteroids[i];
+		ast->x += ast->xvel * dt;
+		ast->y += ast->yvel * dt;
+	}
+
+	return 1;
+}
+
+static int
+world_render(struct World *world, struct RenderList *rndr_list)
+{
+	render_list_add_sprite(
+		rndr_list,
+		world->player.sprite,
+		world->player.x - world->player.sprite->width / 2,
+		world->player.y
+	);
+
+	for (int i = 0; i < MAX_ASTEROIDS; i++) {
+		render_list_add_sprite(
+			rndr_list,
+			world->asteroids[i].sprite,
+			world->asteroids[i].x,
+			world->asteroids[i].y
+		);
+	}
+
 	return 1;
 }
 
 int
 main(int argc, char *argv[])
 {
-	struct Pipeline pipeline;
-	SDL_Window *win = NULL;
-	SDL_GLContext *ctx = NULL;
-	if (!init(SCREEN_WIDTH, SCREEN_HEIGHT, &win, &ctx, &pipeline)) {
+	struct Renderer rndr;
+	struct RenderList rndr_list = { .len = 0 };
+	if (!renderer_init(&rndr, SCREEN_WIDTH, SCREEN_HEIGHT)) {
 		return EXIT_FAILURE;
 	}
 
@@ -402,11 +508,14 @@ main(int argc, char *argv[])
 		run &= world_update(world, dt);
 
 		// render!
-		ok &= render(win, &pipeline, world);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		world_render(world, &rndr_list);
+		render_list_exec(&rndr_list, &rndr);
+		SDL_GL_SwapWindow(rndr.win);
 	}
 
 cleanup:
 	world_destroy(world);
-	shutdown(win, ctx, &pipeline);
+	renderer_shutdown(&rndr);
 	return !(ok == 1);
 }
