@@ -104,6 +104,22 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	int run = 1;
+	while (run) {
+		SDL_Event evt;
+		if (SDL_PollEvent(&evt)) {
+			if (evt.type == SDL_KEYDOWN) {
+				switch (evt.key.keysym.sym) {
+				case SDLK_q:
+				case SDLK_ESCAPE:
+					run = 0;
+				}
+			} else if (evt.type == SDL_QUIT) {
+				run = 0;
+			}
+		}
+	}
+
 	shutdown(win, ctx);
 	return 0;
 }
