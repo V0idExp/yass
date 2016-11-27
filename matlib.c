@@ -86,7 +86,7 @@ mat_rotatev(Mat *m, const Vec *v, float angle)
 	rm.data[10] = cos_a + k * z * z;
 	rm.data[15] = 1.0f;
 
-	mat_mul(m, &rm, &tmp);
+	mat_mul(&rm, m, &tmp);
 	memcpy(m, &tmp, sizeof(Mat));
 }
 
