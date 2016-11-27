@@ -15,6 +15,7 @@
 #define MAX_ASTEROIDS 15
 #define MAX_PROJECTILES 20
 #define MAX_ENEMIES 1
+#define ENEMY_SPEED 50.0  // units/second
 #define PLAYER_INITIAL_SPEED 100.0  // units/second
 #define PLAYER_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
@@ -47,6 +48,9 @@ struct Player {
  */
 struct Enemy {
 	float x, y;
+	float xvel, yvel;
+	float speed;
+	float rot;
 	struct Sprite *sprite;
 };
 
@@ -471,6 +475,7 @@ world_new(void)
 
 	// add enemy
 	w->enemies[0].sprite = spr_enemy_01;
+	w->enemies[0].speed = ENEMY_SPEED;
 	w->enemies[0].y = -SCREEN_HEIGHT / 2 + w->enemies[0].sprite->height / 2;
 
 	// initialize asteroids
@@ -551,6 +556,28 @@ world_update(struct World *world, float dt)
 		world->player.y += distance;
 	}
 
+	// update enemies
+	for (int i = 0; i < MAX_ENEMIES; i++) {
+		struct Enemy *enemy = &world->enemies[i];
+
+		// compute direction to target (player)
+		Vec target = vec(world->player.x, world->player.y, 0, 0);
+		Vec pos = vec(enemy->x, enemy->y, 0, 0);
+		Vec dir, vel;
+		vec_sub(&target, &pos, &dir);
+		vec_norm(&dir);
+
+		// rotate the enemy to match direction
+		enemy->rot = M_PI / 2 - atan2(dir.data[1], dir.data[0]);
+
+		// compute velocity vector
+		vec_mulf(&dir, enemy->speed * dt, &vel);
+
+		// update position
+		enemy->x += vel.data[0];
+		enemy->y += vel.data[1];
+	}
+
 	// handle shooting
 	world->player.shoot_cooldown -= dt;
 	if (world->player.actions & SHOOT &&
@@ -612,7 +639,7 @@ world_render(struct World *world, struct RenderList *rndr_list)
 			world->enemies[i].sprite,
 			world->enemies[i].x,
 			world->enemies[i].y,
-			0
+			world->enemies[i].rot
 		);
 	}
 
