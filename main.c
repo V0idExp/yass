@@ -14,6 +14,7 @@
 #define RENDER_LIST_MAX_LEN 1000
 #define MAX_ASTEROIDS 15
 #define MAX_PROJECTILES 20
+#define MAX_ENEMIES 1
 #define PLAYER_INITIAL_SPEED 100.0  // units/second
 #define PLAYER_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
@@ -38,6 +39,14 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
+	struct Sprite *sprite;
+};
+
+/**
+ * Enemy.
+ */
+struct Enemy {
+	float x, y;
 	struct Sprite *sprite;
 };
 
@@ -71,6 +80,7 @@ struct World {
 	struct Player player;
 	struct Asteroid asteroids[MAX_ASTEROIDS];
 	struct Projectile projectiles[MAX_PROJECTILES];
+	struct Enemy enemies[MAX_ENEMIES];
 };
 
 /**
@@ -110,6 +120,7 @@ struct Renderer {
 
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
+static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
 
@@ -118,12 +129,14 @@ load_resources(void)
 {
 	const char *sprite_files[] = {
 		"data/playerShip1_blue.png",
+		"data/enemyBlack2.png",
 		"data/meteorGrey_small2.png",
 		"data/laserBlue07.png",
 		NULL
 	};
 	struct Sprite **sprites[] = {
 		&spr_player,
+		&spr_enemy_01,
 		&spr_asteroid_01,
 		&spr_projectile_01
 	};
@@ -453,7 +466,12 @@ world_new(void)
 
 	// initialize player
 	w->player.sprite = spr_player;
+	w->player.y = SCREEN_HEIGHT / 2 - spr_player->height / 2;
 	w->player.speed = PLAYER_INITIAL_SPEED;
+
+	// add enemy
+	w->enemies[0].sprite = spr_enemy_01;
+	w->enemies[0].y = -SCREEN_HEIGHT / 2 + w->enemies[0].sprite->height / 2;
 
 	// initialize asteroids
 	for (int i = 0; i < MAX_ASTEROIDS; i++) {
@@ -586,6 +604,16 @@ world_render(struct World *world, struct RenderList *rndr_list)
 				0
 			);
 		}
+	}
+
+	for (int i = 0; i < MAX_ENEMIES; i++) {
+		render_list_add_sprite(
+			rndr_list,
+			world->enemies[i].sprite,
+			world->enemies[i].x,
+			world->enemies[i].y,
+			0
+		);
 	}
 
 	return 1;
