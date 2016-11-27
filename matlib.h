@@ -144,6 +144,9 @@ void
 vec_norm(Vec *v);
 
 void
+vec_clamp(Vec *v, float value);
+
+void
 vec_lerp(const Vec *a, const Vec *b, float t, Vec *r_v);
 
 /*******************************************************************************

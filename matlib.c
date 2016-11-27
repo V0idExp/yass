@@ -524,6 +524,16 @@ void
 vec_norm(Vec *v)
 {
 	vec_mulf(v, 1.0f / vec_mag(v), v);
+
+}
+
+void
+vec_clamp(Vec *v, float value)
+{
+	if (vec_mag(v) > value) {
+		vec_norm(v);
+		vec_imulf(v, value);
+	}
 }
 
 void

@@ -16,7 +16,7 @@
 #define MAX_PROJECTILES 20
 #define MAX_ENEMIES 1
 #define ENEMY_SPEED 50.0  // units/second
-#define PLAYER_INITIAL_SPEED 100.0  // units/second
+#define PLAYER_INITIAL_SPEED 200.0  // units/second
 #define PLAYER_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
 #define PLAYER_PROJECTILE_TTL 5.0  // seconds
@@ -563,19 +563,31 @@ world_update(struct World *world, float dt)
 		// compute direction to target (player)
 		Vec target = vec(world->player.x, world->player.y, 0, 0);
 		Vec pos = vec(enemy->x, enemy->y, 0, 0);
-		Vec dir, vel;
+		Vec dir;
 		vec_sub(&target, &pos, &dir);
 		vec_norm(&dir);
 
-		// rotate the enemy to match direction
-		enemy->rot = M_PI / 2 - atan2(dir.data[1], dir.data[0]);
+		// compute desired velocity vector
+		Vec vel;
+		vec_mulf(&dir, enemy->speed, &vel);
 
-		// compute velocity vector
-		vec_mulf(&dir, enemy->speed * dt, &vel);
+		// compute steering vector
+		Vec steer, curr_vel = vec(enemy->xvel, enemy->yvel, 0, 0);
+		vec_sub(&vel, &curr_vel, &steer);
+		vec_clamp(&steer, 0.5);
+
+		// compute new velocity vector
+		vec_add(&curr_vel, &steer, &vel);
+		vec_clamp(&vel, enemy->speed);
+		enemy->xvel = vel.data[0];
+		enemy->yvel = vel.data[1];
+
+		// rotate the enemy to match direction
+		enemy->rot = M_PI / 2 - atan2(vel.data[1], vel.data[0]);
 
 		// update position
-		enemy->x += vel.data[0];
-		enemy->y += vel.data[1];
+		enemy->x += vel.data[0] * dt;
+		enemy->y += vel.data[1] * dt;
 	}
 
 	// handle shooting
