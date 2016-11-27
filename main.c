@@ -2,21 +2,98 @@
 #include <SDL.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
+#define PLAYER_INITIAL_SPEED 20.0  // units/second
 
 /**
- * Initialize SDL and various subsystems.
+ * Player movement directions bitmask.
+ */
+enum {
+	MOVE_LEFT = 1,
+	MOVE_RIGHT = 1 << 1,
+	MOVE_UP = 1 << 2,
+	MOVE_DOWN = 1 << 3
+};
+
+/**
+ * Player.
+ */
+struct Player {
+	float x, y;     // position
+	int move_dirs;  // movement directions bitfield
+	float speed;    // speed in units/second
+};
+
+/**
+ * World container.
+ *
+ * This struct holds all the objects which make up the game.
+ */
+struct World {
+	struct Player player;
+};
+
+/**
+ * Allocates given amount of bytes and zeroes it.
+ */
+static void*
+alloc0(size_t size);
+
+/**
+ * Allocates given type and initializes it to 0.
+ */
+#define make(t) (alloc0(sizeof(t)))
+
+/**
+ * Initializes SDL and various subsystems.
  */
 static int
 init(unsigned width, unsigned height, SDL_Window **win, SDL_GLContext **ctx);
 
 /**
- * Clean-up and shutdown everything.
+ * Cleans-up and shuts down everything.
  */
 static void
 shutdown(SDL_Window *win, SDL_GLContext *ctx);
+
+/**
+ * Keyboard events handler callback.
+ */
+static int
+handle_key(const SDL_Event *key_evt, struct World *world);
+
+/**
+ * Creates and initializes game world.
+ */
+struct World*
+world_new(void);
+
+/**
+ * Destroys game world.
+ */
+static void
+world_destroy(struct World *w);
+
+/**
+ * Update the world by given delta time.
+ */
+static int
+world_update(struct World *world, float dt);
+
+static void*
+alloc0(size_t size)
+{
+	void *bytes = malloc(size);
+	if (!size) {
+		return NULL;
+	}
+	memset(bytes, 0, size);
+	return bytes;
+}
 
 static int
 init(
@@ -96,6 +173,78 @@ shutdown(SDL_Window *win, SDL_GLContext *ctx)
 	}
 }
 
+static int
+handle_key(const SDL_Event *key_evt, struct World *world)
+{
+	// handle player movement keys
+	int dir = 0;
+	switch (key_evt->key.keysym.sym) {
+	case SDLK_a:
+	case SDLK_LEFT:
+		dir = MOVE_LEFT;
+		break;
+	case SDLK_d:
+	case SDLK_RIGHT:
+		dir = MOVE_RIGHT;
+		break;
+	case SDLK_w:
+	case SDLK_UP:
+		dir = MOVE_UP;
+		break;
+	case SDLK_s:
+	case SDLK_DOWN:
+		dir = MOVE_DOWN;
+		break;
+	}
+
+	if (key_evt->type == SDL_KEYUP) {
+		world->player.move_dirs &= ~dir;
+	} else {
+		world->player.move_dirs |= dir;
+	}
+	return 1;
+}
+
+struct World*
+world_new(void)
+{
+	struct World *w = make(struct World);
+	if (!w) {
+		return NULL;
+	}
+
+	// initialize player
+	w->player.speed = PLAYER_INITIAL_SPEED;
+
+	return w;
+}
+
+static void
+world_destroy(struct World *w)
+{
+	if (w) {
+		free(w);
+	}
+}
+
+static int
+world_update(struct World *world, float dt)
+{
+	// update player position
+	float distance = dt * world->player.speed;
+	if (world->player.move_dirs & MOVE_LEFT) {
+		world->player.x -= distance;
+	} else if (world->player.move_dirs & MOVE_RIGHT) {
+		world->player.x += distance;
+	} else if (world->player.move_dirs & MOVE_UP) {
+		world->player.y -= distance;
+	} else if (world->player.move_dirs & MOVE_DOWN) {
+		world->player.y += distance;
+	}
+
+	return 1;
+}
+
 int main(int argc, char *argv[])
 {
 	SDL_Window *win = NULL;
@@ -104,22 +253,41 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	int ok = 1;
+
+	struct World *world = world_new();
+	if (!world) {
+		ok = 0;
+		goto cleanup;
+	}
+
 	int run = 1;
+	Uint32 last_update = SDL_GetTicks();
 	while (run) {
+		// handle input
 		SDL_Event evt;
-		if (SDL_PollEvent(&evt)) {
-			if (evt.type == SDL_KEYDOWN) {
+		while (SDL_PollEvent(&evt)) {
+			if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP) {
 				switch (evt.key.keysym.sym) {
 				case SDLK_q:
 				case SDLK_ESCAPE:
 					run = 0;
 				}
+				run &= handle_key(&evt, world);
 			} else if (evt.type == SDL_QUIT) {
 				run = 0;
 			}
 		}
+
+		// compute delta time and update the world
+		Uint32 now = SDL_GetTicks();
+		float dt = (now - last_update) / 1000.0f;
+		last_update = now;
+		run &= world_update(world, dt);
 	}
 
+cleanup:
+	world_destroy(world);
 	shutdown(win, ctx);
-	return 0;
+	return !(ok == 1);
 }
