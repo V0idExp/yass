@@ -13,16 +13,21 @@
 #define SCREEN_HEIGHT 800
 #define RENDER_LIST_MAX_LEN 1000
 #define MAX_ASTEROIDS 5
+#define MAX_PROJECTILES 20
 #define PLAYER_INITIAL_SPEED 100.0  // units/second
+#define PLAYER_SHOOT_RATE 1.0  // projectiles/second
+#define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
+#define PLAYER_PROJECTILE_TTL 5.0  // seconds
 
 /**
- * Player movement directions bitmask.
+ * Player action bits.
  */
 enum {
 	MOVE_LEFT = 1,
 	MOVE_RIGHT = 1 << 1,
 	MOVE_UP = 1 << 2,
-	MOVE_DOWN = 1 << 3
+	MOVE_DOWN = 1 << 3,
+	SHOOT = 1 << 4
 };
 
 /**
@@ -30,8 +35,9 @@ enum {
  */
 struct Player {
 	float x, y;     // position
-	int move_dirs;  // movement directions bitfield
+	int actions;    // actions bitmask
 	float speed;    // speed in units/second
+	float shoot_cooldown;
 	struct Sprite *sprite;
 };
 
@@ -47,6 +53,16 @@ struct Asteroid {
 };
 
 /**
+ * Projectile.
+ */
+struct Projectile {
+	float x, y;
+	float xvel, yvel;
+	float ttl;
+	struct Sprite *sprite;
+};
+
+/**
  * World container.
  *
  * This struct holds all the objects which make up the game.
@@ -54,6 +70,7 @@ struct Asteroid {
 struct World {
 	struct Player player;
 	struct Asteroid asteroids[MAX_ASTEROIDS];
+	struct Projectile projectiles[MAX_PROJECTILES];
 };
 
 /**
@@ -90,6 +107,44 @@ struct Renderer {
 	SDL_GLContext *ctx;
 	struct Pipeline pipeline;
 };
+
+/*** RESOURCES ***/
+static struct Sprite *spr_player = NULL;
+static struct Sprite *spr_asteroid_01 = NULL;
+static struct Sprite *spr_projectile_01 = NULL;
+
+static int
+load_resources(void)
+{
+	const char *sprite_files[] = {
+		"data/playerShip1_blue.png",
+		"data/meteorGrey_small2.png",
+		"data/laserBlue07.png",
+		NULL
+	};
+	struct Sprite **sprites[] = {
+		&spr_player,
+		&spr_asteroid_01,
+		&spr_projectile_01
+	};
+	for (int i = 0; sprite_files[i] != NULL; i++) {
+		if (!(*sprites[i] = sprite_from_file(sprite_files[i]))) {
+			fprintf(stderr, "failed to load `%s`\n", sprite_files[i]);
+			return 0;
+		}
+		printf("loaded sprite `%s`\n", sprite_files[i]);
+	}
+
+	return 1;
+}
+
+static void
+cleanup_resources(void)
+{
+	sprite_destroy(spr_player);
+	sprite_destroy(spr_asteroid_01);
+	sprite_destroy(spr_projectile_01);
+}
 
 /**
  * Adds the given sprite to the render list.
@@ -277,31 +332,34 @@ renderer_shutdown(struct Renderer *rndr)
 static int
 handle_key(const SDL_Event *key_evt, struct World *world)
 {
-	// handle player movement keys
-	int dir = 0;
+	// handle player actions
+	int act = 0;
 	switch (key_evt->key.keysym.sym) {
 	case SDLK_a:
 	case SDLK_LEFT:
-		dir = MOVE_LEFT;
+		act = MOVE_LEFT;
 		break;
 	case SDLK_d:
 	case SDLK_RIGHT:
-		dir = MOVE_RIGHT;
+		act = MOVE_RIGHT;
 		break;
 	case SDLK_w:
 	case SDLK_UP:
-		dir = MOVE_UP;
+		act = MOVE_UP;
 		break;
 	case SDLK_s:
 	case SDLK_DOWN:
-		dir = MOVE_DOWN;
+		act = MOVE_DOWN;
+		break;
+	case SDLK_SPACE:
+		act = SHOOT;
 		break;
 	}
 
 	if (key_evt->type == SDL_KEYUP) {
-		world->player.move_dirs &= ~dir;
+		world->player.actions &= ~act;
 	} else {
-		world->player.move_dirs |= dir;
+		world->player.actions |= act;
 	}
 	return 1;
 }
@@ -388,62 +446,51 @@ world_new(void)
 	}
 
 	// initialize player
-	w->player.sprite = sprite_from_file("data/playerShip1_blue.png");
-	if (!w->player.sprite) {
-		goto error;
-	}
+	w->player.sprite = spr_player;
 	w->player.speed = PLAYER_INITIAL_SPEED;
 
 	// initialize asteroids
-	struct Sprite *ast_spr = sprite_from_file("data/meteorGrey_small2.png");
-	if (!ast_spr) {
-		goto error;
-	}
 	for (int i = 0; i < MAX_ASTEROIDS; i++) {
 		struct Asteroid *ast = &w->asteroids[i];
 		ast->x = -SCREEN_WIDTH / 2 + random() % SCREEN_WIDTH / 2;
 		ast->y = -SCREEN_HEIGHT / 2 + random() % SCREEN_HEIGHT / 2;
 		ast->xvel = ((random() % 2) ? -1 : 1) * (random() % 25);
 		ast->yvel = ((random() % 2) ? -1 : 1) * (random() % 25);
-		ast->sprite = ast_spr;
+		ast->sprite = spr_asteroid_01;
 		ast->rot_speed = ((random() % 2) ? -1 : 1) * 2.0 * M_PI / (2 + random() % 6);
 	}
 
 	return w;
-
-error:
-	world_destroy(w);
-	return NULL;
 }
 
 static void
 world_destroy(struct World *w)
 {
 	if (w) {
-		sprite_destroy(w->player.sprite);
-		sprite_destroy(w->asteroids[0].sprite);
 		free(w);
 	}
+}
+
+static void
+world_add_projectile(struct World *w, const struct Projectile *projectile)
+{
+	size_t oldest = 0;
+	float oldest_ttl = PLAYER_PROJECTILE_TTL;
+	for (size_t i = 0; i < MAX_PROJECTILES; i++) {
+		if (w->projectiles[i].ttl <= 0) {
+			w->projectiles[i] = *projectile;
+			return;
+		} else if (w->projectiles[i].ttl < oldest_ttl) {
+			oldest_ttl = w->projectiles[i].ttl;
+			oldest = i;
+		}
+	}
+	w->projectiles[oldest] = *projectile;
 }
 
 static int
 world_update(struct World *world, float dt)
 {
-	// update player position
-	float distance = dt * world->player.speed;
-	if (world->player.move_dirs & MOVE_LEFT) {
-		world->player.x -= distance;
-	}
-	if (world->player.move_dirs & MOVE_RIGHT) {
-		world->player.x += distance;
-	}
-	if (world->player.move_dirs & MOVE_UP) {
-		world->player.y -= distance;
-	}
-	if (world->player.move_dirs & MOVE_DOWN) {
-		world->player.y += distance;
-	}
-
 	// update asteroids
 	for (int i = 0; i < MAX_ASTEROIDS; i++) {
 		struct Asteroid *ast = &world->asteroids[i];
@@ -453,6 +500,49 @@ world_update(struct World *world, float dt)
 		if (ast->rot >= M_PI * 2) {
 			ast->rot -= M_PI * 2;
 		}
+	}
+
+	// update projectiles
+	for (int i = 0; i < MAX_PROJECTILES; i++) {
+		struct Projectile *prj = &world->projectiles[i];
+		if (prj->ttl > 0) {
+			prj->x += prj->xvel * dt;
+			prj->y += prj->yvel * dt;
+			prj->ttl -= dt;
+		}
+	}
+
+	// update player position
+	float distance = dt * world->player.speed;
+	if (world->player.actions & MOVE_LEFT) {
+		world->player.x -= distance;
+	}
+	if (world->player.actions & MOVE_RIGHT) {
+		world->player.x += distance;
+	}
+	if (world->player.actions & MOVE_UP) {
+		world->player.y -= distance;
+	}
+	if (world->player.actions & MOVE_DOWN) {
+		world->player.y += distance;
+	}
+
+	// handle shooting
+	world->player.shoot_cooldown -= dt;
+	if (world->player.actions & SHOOT &&
+	    world->player.shoot_cooldown <= 0) {
+		// reset cooldown timer
+		world->player.shoot_cooldown = 1.0 / PLAYER_SHOOT_RATE;
+		// shoot
+		struct Projectile p = {
+			.x = world->player.x,
+			.y = world->player.y,
+			.xvel = 0,
+			.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED,
+			.ttl = PLAYER_PROJECTILE_TTL,
+			.sprite = spr_projectile_01
+		};
+		world_add_projectile(world, &p);
 	}
 
 	return 1;
@@ -479,6 +569,19 @@ world_render(struct World *world, struct RenderList *rndr_list)
 		);
 	}
 
+	for (int i = 0; i < MAX_PROJECTILES; i++) {
+		struct Projectile *prj = &world->projectiles[i];
+		if (prj->ttl > 0) {
+			render_list_add_sprite(
+				rndr_list,
+				prj->sprite,
+				prj->x,
+				prj->y,
+				0
+			);
+		}
+	}
+
 	return 1;
 }
 
@@ -491,10 +594,14 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	int ok = 1;
+	struct World *world = NULL;
 
-	struct World *world = world_new();
-	if (!world) {
+	int ok = load_resources();
+	if (!ok) {
+		goto cleanup;
+	}
+
+	if (!(world = world_new())) {
 		ok = 0;
 		goto cleanup;
 	}
@@ -532,6 +639,7 @@ main(int argc, char *argv[])
 
 cleanup:
 	world_destroy(world);
+	cleanup_resources();
 	renderer_shutdown(&rndr);
 	return !(ok == 1);
 }
