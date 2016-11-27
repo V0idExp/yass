@@ -11,7 +11,7 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
-#define PLAYER_INITIAL_SPEED 20.0  // units/second
+#define PLAYER_INITIAL_SPEED 100.0  // units/second
 
 /**
  * Player movement directions bitmask.
@@ -279,7 +279,7 @@ render(struct SDL_Window *win, struct Pipeline *pipeline, struct World *world)
 	mat_translate(
 		&transform,
 		world->player.x - world->player.sprite->width / 2,
-		world->player.y - world->player.sprite->height / 2,
+		-world->player.y + world->player.sprite->height / 2,
 		0
 	);
 	mat_mul(&pipeline->projection, &transform, &mvp);
@@ -345,11 +345,14 @@ world_update(struct World *world, float dt)
 	float distance = dt * world->player.speed;
 	if (world->player.move_dirs & MOVE_LEFT) {
 		world->player.x -= distance;
-	} else if (world->player.move_dirs & MOVE_RIGHT) {
+	}
+	if (world->player.move_dirs & MOVE_RIGHT) {
 		world->player.x += distance;
-	} else if (world->player.move_dirs & MOVE_UP) {
+	}
+	if (world->player.move_dirs & MOVE_UP) {
 		world->player.y -= distance;
-	} else if (world->player.move_dirs & MOVE_DOWN) {
+	}
+	if (world->player.move_dirs & MOVE_DOWN) {
 		world->player.y += distance;
 	}
 
