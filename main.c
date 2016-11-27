@@ -12,7 +12,7 @@
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
 #define RENDER_LIST_MAX_LEN 1000
-#define MAX_ASTEROIDS 5
+#define MAX_ASTEROIDS 15
 #define MAX_PROJECTILES 20
 #define PLAYER_INITIAL_SPEED 100.0  // units/second
 #define PLAYER_SHOOT_RATE 1.0  // projectiles/second
@@ -452,8 +452,8 @@ world_new(void)
 	// initialize asteroids
 	for (int i = 0; i < MAX_ASTEROIDS; i++) {
 		struct Asteroid *ast = &w->asteroids[i];
-		ast->x = -SCREEN_WIDTH / 2 + random() % SCREEN_WIDTH / 2;
-		ast->y = -SCREEN_HEIGHT / 2 + random() % SCREEN_HEIGHT / 2;
+		ast->x = random() % SCREEN_WIDTH - SCREEN_WIDTH / 2;
+		ast->y = random() % SCREEN_HEIGHT - SCREEN_HEIGHT / 2;
 		ast->xvel = ((random() % 2) ? -1 : 1) * (random() % 25);
 		ast->yvel = ((random() % 2) ? -1 : 1) * (random() % 25);
 		ast->sprite = spr_asteroid_01;
