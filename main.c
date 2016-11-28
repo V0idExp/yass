@@ -406,17 +406,23 @@ render_world(struct World *world, struct RenderList *rndr_list)
 int
 main(int argc, char *argv[])
 {
+	int ok = 1;
+	struct World *world = NULL;
+
 	struct Renderer rndr;
 	struct RenderList rndr_list = { .len = 0 };
 	if (!renderer_init(&rndr, SCREEN_WIDTH, SCREEN_HEIGHT)) {
 		return EXIT_FAILURE;
 	}
 
-	struct World *world = NULL;
-	struct ScriptEnv *env = NULL;
+	// create Lua script environment
+	struct ScriptEnv *env = script_env_new();
+	if (!env) {
+		ok = 0;
+		goto cleanup;
+	}
 
-	int ok = load_resources();
-	if (!ok) {
+	if (!(ok = load_resources())) {
 		goto cleanup;
 	}
 
@@ -426,8 +432,8 @@ main(int argc, char *argv[])
 	}
 
 	// initialize script environment
-	env = script_env_new();
-	if (!env || !script_env_init(env, world)) {
+	if (!script_env_init(env, world) ||
+	    !script_load(env, "data/scripts/game.lua")) {
 		ok = 0;
 		goto cleanup;
 	}
