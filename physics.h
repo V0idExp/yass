@@ -13,11 +13,12 @@ struct Body {
 	void *userdata;
 };
 
-typedef int (*CollisionCallback)(struct Body *a, struct Body *b);
+typedef int (*CollisionCallback)(struct Body *a, struct Body *b, void *userdata);
 
 struct CollisionHandler {
 	CollisionCallback callback;
 	int type_mask;
+	void *userdata;
 };
 
 struct SimulationSystem {
@@ -41,6 +42,9 @@ sim_add_body(struct SimulationSystem *sys, const struct Body *body);
 
 struct Body*
 sim_get_body(struct SimulationSystem *sys, int hnd);
+
+void
+sim_remove_body(struct SimulationSystem *sys, int hnd);
 
 int
 sim_add_handler(struct SimulationSystem *sys, const struct CollisionHandler *hnd);

@@ -33,7 +33,7 @@ dispatch_collision(struct CollisionHandler handlers[], struct Body *a, struct Bo
 		if (handlers[i].callback &&
 		    handlers[i].type_mask & a->type &&
 		    handlers[i].type_mask & b->type) {
-			    handlers[i].callback(a, b);
+			    handlers[i].callback(a, b, handlers[i].userdata);
 		    }
 	}
 }
@@ -88,6 +88,12 @@ sim_get_body(struct SimulationSystem *sys, int hnd)
 		return &sys->bodies[hnd];
 	}
 	return NULL;
+}
+
+void
+sim_remove_body(struct SimulationSystem *sys, int hnd)
+{
+	sys->used_bodies[hnd] = 0;
 }
 
 int

@@ -13,11 +13,51 @@ enum {
 	BODY_TYPE_ASTEROID = 1 << 2
 };
 
-static int
-handle_player_collision(struct Body *a, struct Body *b)
+static void
+add_event(struct World *world, const struct Event *evt)
 {
-	struct Player *p = a->type == BODY_TYPE_PLAYER ? a->userdata : b->userdata;
-	p->collided = 1;
+	// extend the event queue
+	if (world->event_count == world->event_queue_size) {
+		size_t new_size = world->event_queue_size + EVENT_QUEUE_BASE_SIZE;
+		void *new_queue = realloc(
+			world->event_queue,
+			sizeof(struct Event) * new_size
+		);
+		if (!new_queue) {
+			fprintf(stderr, "event queue too long: out of memory\n");
+			exit(EXIT_FAILURE);
+		}
+		world->event_queue = new_queue;
+		world->event_queue_size = new_size;
+	}
+
+	// append the event to the end of the queue
+	world->event_queue[world->event_count++] = *evt;
+}
+
+static int
+handle_player_collision(struct Body *a, struct Body *b, void *userdata)
+{
+	if (a->type != BODY_TYPE_PLAYER) {
+		return 1;
+	}
+
+	struct Event evt = { 0 };
+	if (b->type == BODY_TYPE_ENEMY) {
+		struct Enemy *enemy = b->userdata;
+		evt.type = EVENT_ENEMY_HIT;
+		evt.entity_hnd = enemy->id;
+	} else if (b->type == BODY_TYPE_ASTEROID) {
+		struct Asteroid *ast = b->userdata;
+		evt.type = EVENT_ASTEROID_HIT;
+		evt.entity_hnd = ast->id;
+	}
+
+	if (evt.type != 0) {
+		struct World *world = userdata;
+		add_event(world, &evt);
+	}
+
 	return 1;
 }
 
@@ -36,8 +76,16 @@ world_new(void)
 		return NULL;
 	}
 	struct CollisionHandler handlers[] = {
-		{ handle_player_collision, BODY_TYPE_PLAYER | BODY_TYPE_ENEMY },
-		{ handle_player_collision, BODY_TYPE_PLAYER | BODY_TYPE_ASTEROID },
+		{
+			handle_player_collision,
+			BODY_TYPE_PLAYER | BODY_TYPE_ENEMY,
+			w
+		},
+		{
+			handle_player_collision,
+			BODY_TYPE_PLAYER | BODY_TYPE_ASTEROID,
+			w
+		},
 		{ NULL }
 	};
 	for (int i = 0; handlers[i].callback; i++) {
@@ -47,7 +95,16 @@ world_new(void)
 		}
 	}
 
+	// initialize event queue
+	w->event_queue = malloc(sizeof(struct Event) * EVENT_QUEUE_BASE_SIZE);
+	if (!w->event_queue) {
+		world_destroy(w);
+		return NULL;
+	}
+	w->event_queue_size = EVENT_QUEUE_BASE_SIZE;
+
 	// initialize player
+	w->player.hitpoints = PLAYER_INITIAL_HITPOINTS;
 	w->player.y = SCREEN_HEIGHT / 2 - 50;
 	w->player.speed = PLAYER_INITIAL_SPEED;
 	struct Body player_body = {
@@ -71,6 +128,7 @@ void
 world_destroy(struct World *w)
 {
 	if (w) {
+		free(w->event_queue);
 		sim_destroy(w->sim);
 		destroy(w);
 	}
@@ -82,6 +140,7 @@ world_add_asteroid(struct World *world, const struct Asteroid *ast)
 	if (world->asteroid_count < MAX_ASTEROIDS) {
 		int i = world->asteroid_count++;
 		world->asteroids[i] = *ast;
+		world->asteroids[i].id = i;
 		return i;
 	}
 	return -1;
@@ -93,6 +152,7 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 	if (world->enemy_count < MAX_ENEMIES) {
 		int i = world->enemy_count++;
 		world->enemies[i] = *enemy;
+		world->enemies[i].hitpoints = ENEMY_INITIAL_HITPOINTS;
 
 		struct Body body = {
 			.x = enemy->x,
@@ -110,6 +170,7 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 			return -1;
 		}
 
+		world->enemies[i].id = i;
 		return i;
 	}
 	return -1;
@@ -123,6 +184,7 @@ world_add_projectile(struct World *w, const struct Projectile *projectile)
 	for (size_t i = 0; i < MAX_PROJECTILES; i++) {
 		if (w->projectiles[i].ttl <= 0) {
 			w->projectiles[i] = *projectile;
+			w->projectiles[i].id = i;
 			return;
 		} else if (w->projectiles[i].ttl < oldest_ttl) {
 			oldest_ttl = w->projectiles[i].ttl;
@@ -135,6 +197,8 @@ world_add_projectile(struct World *w, const struct Projectile *projectile)
 int
 world_update(struct World *world, float dt)
 {
+	struct Player *plr = &world->player;
+
 	// update physics
 	static float sim_acc = 0;
 	sim_acc += dt;
@@ -143,62 +207,76 @@ world_update(struct World *world, float dt)
 		sim_acc -= SIMULATION_STEP;
 	}
 
-	// check game conditions
-	if (world->player.collided) {
-		printf("you're dead\n");
-		return 0;
-	}
-
-	// update asteroids
-	for (int i = 0; i < world->asteroid_count; i++) {
-		struct Asteroid *ast = &world->asteroids[i];
-		ast->x += ast->xvel * dt;
-		ast->y += ast->yvel * dt;
-		ast->rot += ast->rot_speed * dt;
-		if (ast->rot >= M_PI * 2) {
-			ast->rot -= M_PI * 2;
+	// process events
+	for (size_t i = 0; i < world->event_count; i++) {
+		struct Event *evt = &world->event_queue[i];
+		switch (evt->type) {
+		case EVENT_ENEMY_HIT:
+			printf("player hit by enemy!\n");
+			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
+			world->enemies[evt->entity_hnd].hitpoints = 0;
+			sim_remove_body(
+				world->sim,
+				world->enemies[evt->entity_hnd].body_hnd
+			);
+			break;
+		case EVENT_ASTEROID_HIT:
+			printf("player hit by asteroid!\n");
+			break;
 		}
 	}
-
-	// update projectiles
-	for (int i = 0; i < MAX_PROJECTILES; i++) {
-		struct Projectile *prj = &world->projectiles[i];
-		if (prj->ttl > 0) {
-			prj->x += prj->xvel * dt;
-			prj->y += prj->yvel * dt;
-			prj->ttl -= dt;
-		}
-	}
+	world->event_count = 0;
 
 	// update player position
-	float distance = dt * world->player.speed;
-	if (world->player.actions & ACTION_MOVE_LEFT) {
-		world->player.x -= distance;
+	float distance = dt * plr->speed;
+	if (plr->actions & ACTION_MOVE_LEFT) {
+		plr->x -= distance;
 	}
-	if (world->player.actions & ACTION_MOVE_RIGHT) {
-		world->player.x += distance;
+	if (plr->actions & ACTION_MOVE_RIGHT) {
+		plr->x += distance;
 	}
-	if (world->player.actions & ACTION_MOVE_UP) {
-		world->player.y -= distance;
+	if (plr->actions & ACTION_MOVE_UP) {
+		plr->y -= distance;
 	}
-	if (world->player.actions & ACTION_MOVE_DOWN) {
-		world->player.y += distance;
+	if (plr->actions & ACTION_MOVE_DOWN) {
+		plr->y += distance;
 	}
 
 	// update player body position
 	struct Body *player_body = sim_get_body(
 		world->sim,
-		world->player.body_hnd
+		plr->body_hnd
 	);
-	player_body->x = world->player.x;
-	player_body->y = world->player.y;
+	player_body->x = plr->x;
+	player_body->y = plr->y;
+
+
+	// handle shooting
+	plr->shoot_cooldown -= dt;
+	if (plr->actions & ACTION_SHOOT &&
+	    plr->shoot_cooldown <= 0) {
+		// reset cooldown timer
+		plr->shoot_cooldown = 1.0 / PLAYER_ACTION_SHOOT_RATE;
+		// shoot
+		struct Projectile p = {
+			.x = plr->x,
+			.y = plr->y,
+			.xvel = 0,
+			.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED,
+			.ttl = PLAYER_PROJECTILE_TTL
+		};
+		world_add_projectile(world, &p);
+	}
 
 	// update enemies
 	for (int i = 0; i < world->enemy_count; i++) {
 		struct Enemy *enemy = &world->enemies[i];
+		if (enemy->hitpoints <= 0) {
+			continue;
+		}
 
 		// compute direction to target (player)
-		Vec target = vec(world->player.x, world->player.y, 0, 0);
+		Vec target = vec(plr->x, plr->y, 0, 0);
 		Vec pos = vec(enemy->x, enemy->y, 0, 0);
 		Vec dir;
 		vec_sub(&target, &pos, &dir);
@@ -231,21 +309,25 @@ world_update(struct World *world, float dt)
 		body->y = enemy->y;
 	}
 
-	// handle shooting
-	world->player.shoot_cooldown -= dt;
-	if (world->player.actions & ACTION_SHOOT &&
-	    world->player.shoot_cooldown <= 0) {
-		// reset cooldown timer
-		world->player.shoot_cooldown = 1.0 / PLAYER_ACTION_SHOOT_RATE;
-		// shoot
-		struct Projectile p = {
-			.x = world->player.x,
-			.y = world->player.y,
-			.xvel = 0,
-			.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED,
-			.ttl = PLAYER_PROJECTILE_TTL
-		};
-		world_add_projectile(world, &p);
+	// update asteroids
+	for (int i = 0; i < world->asteroid_count; i++) {
+		struct Asteroid *ast = &world->asteroids[i];
+		ast->x += ast->xvel * dt;
+		ast->y += ast->yvel * dt;
+		ast->rot += ast->rot_speed * dt;
+		if (ast->rot >= M_PI * 2) {
+			ast->rot -= M_PI * 2;
+		}
+	}
+
+	// update projectiles
+	for (int i = 0; i < MAX_PROJECTILES; i++) {
+		struct Projectile *prj = &world->projectiles[i];
+		if (prj->ttl > 0) {
+			prj->x += prj->xvel * dt;
+			prj->y += prj->yvel * dt;
+			prj->ttl -= dt;
+		}
 	}
 
 	return 1;

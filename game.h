@@ -8,11 +8,16 @@
 #define MAX_PROJECTILES 20
 #define MAX_ENEMIES 20
 #define ENEMY_SPEED 50.0  // units/second
+#define ENEMY_INITIAL_HITPOINTS 30.0
+#define ASTEROID_COLLISION_DAMAGE 20
+#define ENEMY_COLLISION_DAMAGE 50
+#define PLAYER_INITIAL_HITPOINTS 100.0
 #define PLAYER_INITIAL_SPEED 200.0  // units/second
 #define PLAYER_ACTION_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
 #define PLAYER_PROJECTILE_TTL 5.0  // seconds
 #define SIMULATION_STEP 1.0 / 15
+#define EVENT_QUEUE_BASE_SIZE 20
 
 /**
  * Player action bits.
@@ -29,11 +34,11 @@ enum {
  * Player.
  */
 struct Player {
+	float hitpoints;
 	float x, y;     // position
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
-	int collided;
 	int body_hnd;
 };
 
@@ -41,6 +46,8 @@ struct Player {
  * Enemy.
  */
 struct Enemy {
+	int id;
+	float hitpoints;
 	float x, y;
 	float xvel, yvel;
 	float speed;
@@ -52,6 +59,7 @@ struct Enemy {
  * Asteroid.
  */
 struct Asteroid {
+	int id;
 	float x, y;
 	float xvel, yvel;
 	float rot;
@@ -62,9 +70,27 @@ struct Asteroid {
  * Projectile.
  */
 struct Projectile {
+	int id;
 	float x, y;
 	float xvel, yvel;
 	float ttl;
+};
+
+/**
+ * Game event types.
+ */
+enum {
+	EVENT_PLAYER_HIT = 1,
+	EVENT_ENEMY_HIT,
+	EVENT_ASTEROID_HIT
+};
+
+/**
+ * Game event.
+ */
+struct Event {
+	int type;
+	int entity_hnd;
 };
 
 /**
@@ -81,6 +107,10 @@ struct World {
 	size_t enemy_count;
 
 	struct SimulationSystem *sim;
+
+	struct Event *event_queue;
+	size_t event_queue_size;
+	size_t event_count;
 };
 
 /**
