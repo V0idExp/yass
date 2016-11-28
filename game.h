@@ -1,5 +1,7 @@
 #pragma once
 
+#include "physics.h"
+
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
 #define MAX_ASTEROIDS 100
@@ -10,6 +12,7 @@
 #define PLAYER_ACTION_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
 #define PLAYER_PROJECTILE_TTL 5.0  // seconds
+#define SIMULATION_STEP 1.0 / 15
 
 /**
  * Player action bits.
@@ -30,6 +33,8 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
+	int collided;
+	int body_hnd;
 };
 
 /**
@@ -40,6 +45,7 @@ struct Enemy {
 	float xvel, yvel;
 	float speed;
 	float rot;
+	int body_hnd;
 };
 
 /**
@@ -73,6 +79,8 @@ struct World {
 	struct Projectile projectiles[MAX_PROJECTILES];
 	struct Enemy enemies[MAX_ENEMIES];
 	size_t enemy_count;
+
+	struct SimulationSystem *sim;
 };
 
 /**

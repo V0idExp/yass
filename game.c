@@ -1,7 +1,25 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
+
+/**
+ * Enumeration of body type bits.
+ */
+enum {
+	BODY_TYPE_PLAYER = 1,
+	BODY_TYPE_ENEMY = 1 << 1,
+	BODY_TYPE_ASTEROID = 1 << 2
+};
+
+static int
+handle_player_collision(struct Body *a, struct Body *b)
+{
+	struct Player *p = a->type == BODY_TYPE_PLAYER ? a->userdata : b->userdata;
+	p->collided = 1;
+	return 1;
+}
 
 struct World*
 world_new(void)
@@ -11,9 +29,40 @@ world_new(void)
 		return NULL;
 	}
 
+	// initialize simulation system and register collision callbacks
+	w->sim = sim_new();
+	if (!w->sim) {
+		world_destroy(w);
+		return NULL;
+	}
+	struct CollisionHandler handlers[] = {
+		{ handle_player_collision, BODY_TYPE_PLAYER | BODY_TYPE_ENEMY },
+		{ handle_player_collision, BODY_TYPE_PLAYER | BODY_TYPE_ASTEROID },
+		{ NULL }
+	};
+	for (int i = 0; handlers[i].callback; i++) {
+		if (sim_add_handler(w->sim, &handlers[i]) < 0) {
+			world_destroy(w);
+			return NULL;
+		}
+	}
+
 	// initialize player
 	w->player.y = SCREEN_HEIGHT / 2 - 50;
 	w->player.speed = PLAYER_INITIAL_SPEED;
+	struct Body player_body = {
+		.x = w->player.x,
+		.y = w->player.y,
+		.radius = 40,
+		.type = BODY_TYPE_PLAYER,
+		.collision_mask = BODY_TYPE_ENEMY | BODY_TYPE_ASTEROID,
+		.userdata = &w->player
+	};
+	w->player.body_hnd = sim_add_body(w->sim, &player_body);
+	if (w->player.body_hnd < 0) {
+		world_destroy(w);
+		return NULL;
+	}
 
 	return w;
 }
@@ -22,6 +71,7 @@ void
 world_destroy(struct World *w)
 {
 	if (w) {
+		sim_destroy(w->sim);
 		destroy(w);
 	}
 }
@@ -43,6 +93,23 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 	if (world->enemy_count < MAX_ENEMIES) {
 		int i = world->enemy_count++;
 		world->enemies[i] = *enemy;
+
+		struct Body body = {
+			.x = enemy->x,
+			.y = enemy->y,
+			.radius = 40,
+			.type = BODY_TYPE_ENEMY,
+			.collision_mask = BODY_TYPE_PLAYER,
+			.userdata = &world->enemies[i]
+		};
+		world->enemies[i].body_hnd = sim_add_body(
+			world->sim,
+			&body
+		);
+		if (world->enemies[i].body_hnd < 0) {
+			return -1;
+		}
+
 		return i;
 	}
 	return -1;
@@ -68,6 +135,20 @@ world_add_projectile(struct World *w, const struct Projectile *projectile)
 int
 world_update(struct World *world, float dt)
 {
+	// update physics
+	static float sim_acc = 0;
+	sim_acc += dt;
+	while (sim_acc >= SIMULATION_STEP) {
+		sim_step(world->sim, SIMULATION_STEP);
+		sim_acc -= SIMULATION_STEP;
+	}
+
+	// check game conditions
+	if (world->player.collided) {
+		printf("you're dead\n");
+		return 0;
+	}
+
 	// update asteroids
 	for (int i = 0; i < world->asteroid_count; i++) {
 		struct Asteroid *ast = &world->asteroids[i];
@@ -104,6 +185,14 @@ world_update(struct World *world, float dt)
 		world->player.y += distance;
 	}
 
+	// update player body position
+	struct Body *player_body = sim_get_body(
+		world->sim,
+		world->player.body_hnd
+	);
+	player_body->x = world->player.x;
+	player_body->y = world->player.y;
+
 	// update enemies
 	for (int i = 0; i < world->enemy_count; i++) {
 		struct Enemy *enemy = &world->enemies[i];
@@ -136,6 +225,10 @@ world_update(struct World *world, float dt)
 		// update position
 		enemy->x += vel.data[0] * dt;
 		enemy->y += vel.data[1] * dt;
+
+		struct Body *body = sim_get_body(world->sim, enemy->body_hnd);
+		body->x = enemy->x;
+		body->y = enemy->y;
 	}
 
 	// handle shooting
