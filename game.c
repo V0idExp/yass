@@ -15,10 +15,6 @@ world_new(void)
 	w->player.y = SCREEN_HEIGHT / 2 - 50;
 	w->player.speed = PLAYER_INITIAL_SPEED;
 
-	// add enemy
-	w->enemies[0].speed = ENEMY_SPEED;
-	w->enemies[0].y = -SCREEN_HEIGHT / 2 + 50;
-
 	return w;
 }
 
@@ -36,6 +32,17 @@ world_add_asteroid(struct World *world, const struct Asteroid *ast)
 	if (world->asteroid_count < MAX_ASTEROIDS) {
 		int i = world->asteroid_count++;
 		world->asteroids[i] = *ast;
+		return i;
+	}
+	return -1;
+}
+
+int
+world_add_enemy(struct World *world, const struct Enemy *enemy)
+{
+	if (world->enemy_count < MAX_ENEMIES) {
+		int i = world->enemy_count++;
+		world->enemies[i] = *enemy;
 		return i;
 	}
 	return -1;
@@ -98,7 +105,7 @@ world_update(struct World *world, float dt)
 	}
 
 	// update enemies
-	for (int i = 0; i < MAX_ENEMIES; i++) {
+	for (int i = 0; i < world->enemy_count; i++) {
 		struct Enemy *enemy = &world->enemies[i];
 
 		// compute direction to target (player)

@@ -113,8 +113,41 @@ luafunc_add_asteroid(lua_State *state)
 	return 1;
 }
 
+/**
+ * Add an enemy.
+ *
+ * Arguments:
+ *     x:     Position x coordinate.
+ *     y:     Position y coordinate.
+ *     speed: Enemy speed.
+ */
+static int
+luafunc_add_enemy(lua_State *state)
+{
+	static struct Arg args[] = {
+		{ LUA_TNUMBER, "x" },
+		{ LUA_TNUMBER, "y" },
+		{ LUA_TNUMBER, "speed" },
+		{ LUA_TNIL }
+	};
+	lua_Number x, y, speed;
+	get_args(state, args, &x, &y, &speed);
+
+	struct Enemy enemy = {
+		.x = x,
+		.y = y,
+		.speed = speed
+	};
+	struct World *world = get_world_upvalue(state);
+	int id = world_add_enemy(world, &enemy);
+	lua_pushinteger(state, id);
+
+	return 1;
+}
+
 static const luaL_Reg reg[] = {
 	{ "add_asteroid", luafunc_add_asteroid },
+	{ "add_enemy", luafunc_add_enemy },
 	{ NULL, NULL }
 };
 

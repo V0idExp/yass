@@ -390,7 +390,7 @@ render_world(struct World *world, struct RenderList *rndr_list)
 		}
 	}
 
-	for (int i = 0; i < MAX_ENEMIES; i++) {
+	for (int i = 0; i < world->enemy_count; i++) {
 		render_list_add_sprite(
 			rndr_list,
 			spr_enemy_01,

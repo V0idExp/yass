@@ -4,7 +4,7 @@
 #define SCREEN_HEIGHT 800
 #define MAX_ASTEROIDS 100
 #define MAX_PROJECTILES 20
-#define MAX_ENEMIES 1
+#define MAX_ENEMIES 20
 #define ENEMY_SPEED 50.0  // units/second
 #define PLAYER_INITIAL_SPEED 200.0  // units/second
 #define PLAYER_ACTION_SHOOT_RATE 1.0  // projectiles/second
@@ -72,6 +72,7 @@ struct World {
 	size_t asteroid_count;
 	struct Projectile projectiles[MAX_PROJECTILES];
 	struct Enemy enemies[MAX_ENEMIES];
+	size_t enemy_count;
 };
 
 /**
@@ -87,13 +88,19 @@ void
 world_destroy(struct World *w);
 
 /**
- * Add an asteroid into the world.
+ * Add an anemy to the world.
+ */
+int
+world_add_enemy(struct World *world, const struct Enemy *enemy);
+
+/**
+ * Add an asteroid to the world.
  */
 int
 world_add_asteroid(struct World *world, const struct Asteroid *ast);
 
 /**
- * Add a projectile into the world.
+ * Add a projectile tp the world.
  */
 void
 world_add_projectile(struct World *w, const struct Projectile *projectile);
