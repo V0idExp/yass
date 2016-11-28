@@ -11,8 +11,6 @@
 #include "shader.h"
 #include "sprite.h"
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 800
 #define RENDER_LIST_MAX_LEN 1000
 
 /**
@@ -126,36 +124,6 @@ renderer_shutdown(struct Renderer *rndr);
  */
 static int
 handle_key(const SDL_Event *key_evt, struct World *world);
-
-/**
- * Creates and initializes game world.
- */
-struct World*
-world_new(void);
-
-/**
- * Destroys game world.
- */
-static void
-world_destroy(struct World *w);
-
-/**
- * Add a projectile into the world.
- */
-static void
-world_add_projectile(struct World *w, const struct Projectile *projectile);
-
-/**
- * Update the world by given delta time.
- */
-static int
-world_update(struct World *world, float dt);
-
-/**
- * Renders the world.
- */
-static int
-world_render(struct World *world, struct RenderList *rndr_list);
 
 /**
  * Add a render node to render queue.
@@ -388,172 +356,21 @@ render_list_exec(struct RenderList *list, struct Renderer *rndr)
 	return ok;
 }
 
-struct World*
-world_new(void)
-{
-	struct World *w = make(struct World);
-	if (!w) {
-		return NULL;
-	}
-
-	// initialize player
-	w->player.sprite = spr_player;
-	w->player.y = SCREEN_HEIGHT / 2 - spr_player->height / 2;
-	w->player.speed = PLAYER_INITIAL_SPEED;
-
-	// add enemy
-	w->enemies[0].sprite = spr_enemy_01;
-	w->enemies[0].speed = ENEMY_SPEED;
-	w->enemies[0].y = -SCREEN_HEIGHT / 2 + w->enemies[0].sprite->height / 2;
-
-	// initialize asteroids
-	for (int i = 0; i < MAX_ASTEROIDS; i++) {
-		struct Asteroid *ast = &w->asteroids[i];
-		ast->x = random() % SCREEN_WIDTH - SCREEN_WIDTH / 2;
-		ast->y = random() % SCREEN_HEIGHT - SCREEN_HEIGHT / 2;
-		ast->xvel = ((random() % 2) ? -1 : 1) * (random() % 25);
-		ast->yvel = ((random() % 2) ? -1 : 1) * (random() % 25);
-		ast->sprite = spr_asteroid_01;
-		ast->rot_speed = ((random() % 2) ? -1 : 1) * 2.0 * M_PI / (2 + random() % 6);
-	}
-
-	return w;
-}
-
-static void
-world_destroy(struct World *w)
-{
-	if (w) {
-		free(w);
-	}
-}
-
-static void
-world_add_projectile(struct World *w, const struct Projectile *projectile)
-{
-	size_t oldest = 0;
-	float oldest_ttl = PLAYER_PROJECTILE_TTL;
-	for (size_t i = 0; i < MAX_PROJECTILES; i++) {
-		if (w->projectiles[i].ttl <= 0) {
-			w->projectiles[i] = *projectile;
-			return;
-		} else if (w->projectiles[i].ttl < oldest_ttl) {
-			oldest_ttl = w->projectiles[i].ttl;
-			oldest = i;
-		}
-	}
-	w->projectiles[oldest] = *projectile;
-}
-
-static int
-world_update(struct World *world, float dt)
-{
-	// update asteroids
-	for (int i = 0; i < MAX_ASTEROIDS; i++) {
-		struct Asteroid *ast = &world->asteroids[i];
-		ast->x += ast->xvel * dt;
-		ast->y += ast->yvel * dt;
-		ast->rot += ast->rot_speed * dt;
-		if (ast->rot >= M_PI * 2) {
-			ast->rot -= M_PI * 2;
-		}
-	}
-
-	// update projectiles
-	for (int i = 0; i < MAX_PROJECTILES; i++) {
-		struct Projectile *prj = &world->projectiles[i];
-		if (prj->ttl > 0) {
-			prj->x += prj->xvel * dt;
-			prj->y += prj->yvel * dt;
-			prj->ttl -= dt;
-		}
-	}
-
-	// update player position
-	float distance = dt * world->player.speed;
-	if (world->player.actions & ACTION_MOVE_LEFT) {
-		world->player.x -= distance;
-	}
-	if (world->player.actions & ACTION_MOVE_RIGHT) {
-		world->player.x += distance;
-	}
-	if (world->player.actions & ACTION_MOVE_UP) {
-		world->player.y -= distance;
-	}
-	if (world->player.actions & ACTION_MOVE_DOWN) {
-		world->player.y += distance;
-	}
-
-	// update enemies
-	for (int i = 0; i < MAX_ENEMIES; i++) {
-		struct Enemy *enemy = &world->enemies[i];
-
-		// compute direction to target (player)
-		Vec target = vec(world->player.x, world->player.y, 0, 0);
-		Vec pos = vec(enemy->x, enemy->y, 0, 0);
-		Vec dir;
-		vec_sub(&target, &pos, &dir);
-		vec_norm(&dir);
-
-		// compute desired velocity vector
-		Vec vel;
-		vec_mulf(&dir, enemy->speed, &vel);
-
-		// compute steering vector
-		Vec steer, curr_vel = vec(enemy->xvel, enemy->yvel, 0, 0);
-		vec_sub(&vel, &curr_vel, &steer);
-		vec_clamp(&steer, 0.5);
-
-		// compute new velocity vector
-		vec_add(&curr_vel, &steer, &vel);
-		vec_clamp(&vel, enemy->speed);
-		enemy->xvel = vel.data[0];
-		enemy->yvel = vel.data[1];
-
-		// rotate the enemy to match direction
-		enemy->rot = M_PI / 2 - atan2(vel.data[1], vel.data[0]);
-
-		// update position
-		enemy->x += vel.data[0] * dt;
-		enemy->y += vel.data[1] * dt;
-	}
-
-	// handle shooting
-	world->player.shoot_cooldown -= dt;
-	if (world->player.actions & ACTION_SHOOT &&
-	    world->player.shoot_cooldown <= 0) {
-		// reset cooldown timer
-		world->player.shoot_cooldown = 1.0 / PLAYER_ACTION_SHOOT_RATE;
-		// shoot
-		struct Projectile p = {
-			.x = world->player.x,
-			.y = world->player.y,
-			.xvel = 0,
-			.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED,
-			.ttl = PLAYER_PROJECTILE_TTL,
-			.sprite = spr_projectile_01
-		};
-		world_add_projectile(world, &p);
-	}
-
-	return 1;
-}
-
-static int
-world_render(struct World *world, struct RenderList *rndr_list)
+int
+render_world(struct World *world, struct RenderList *rndr_list)
 {
 	render_list_add_sprite(
 		rndr_list,
-		world->player.sprite,
+		spr_player,
 		world->player.x,
 		world->player.y,
 		0.0f
 	);
 
-	for (int i = 0; i < MAX_ASTEROIDS; i++) {
+	for (int i = 0; i < world->asteroid_count; i++) {
 		render_list_add_sprite(
 			rndr_list,
-			world->asteroids[i].sprite,
+			spr_asteroid_01,
 			world->asteroids[i].x,
 			world->asteroids[i].y,
 			world->asteroids[i].rot
@@ -565,7 +382,7 @@ world_render(struct World *world, struct RenderList *rndr_list)
 		if (prj->ttl > 0) {
 			render_list_add_sprite(
 				rndr_list,
-				prj->sprite,
+				spr_projectile_01,
 				prj->x,
 				prj->y,
 				0
@@ -576,7 +393,7 @@ world_render(struct World *world, struct RenderList *rndr_list)
 	for (int i = 0; i < MAX_ENEMIES; i++) {
 		render_list_add_sprite(
 			rndr_list,
-			world->enemies[i].sprite,
+			spr_enemy_01,
 			world->enemies[i].x,
 			world->enemies[i].y,
 			world->enemies[i].rot
@@ -641,7 +458,7 @@ main(int argc, char *argv[])
 
 		// render!
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		world_render(world, &rndr_list);
+		render_world(world, &rndr_list);
 		render_list_exec(&rndr_list, &rndr);
 		SDL_GL_SwapWindow(rndr.win);
 	}
@@ -651,5 +468,6 @@ cleanup:
 	world_destroy(world);
 	cleanup_resources();
 	renderer_shutdown(&rndr);
+	printf(ok ? "Bye!\n" : "Oops!\n");
 	return !(ok == 1);
 }

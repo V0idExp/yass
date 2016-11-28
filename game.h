@@ -1,6 +1,8 @@
 #pragma once
 
-#define MAX_ASTEROIDS 15
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 800
+#define MAX_ASTEROIDS 100
 #define MAX_PROJECTILES 20
 #define MAX_ENEMIES 1
 #define ENEMY_SPEED 50.0  // units/second
@@ -28,7 +30,6 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
-	struct Sprite *sprite;
 };
 
 /**
@@ -39,7 +40,6 @@ struct Enemy {
 	float xvel, yvel;
 	float speed;
 	float rot;
-	struct Sprite *sprite;
 };
 
 /**
@@ -50,7 +50,6 @@ struct Asteroid {
 	float xvel, yvel;
 	float rot;
 	float rot_speed;
-	struct Sprite *sprite;
 };
 
 /**
@@ -60,7 +59,6 @@ struct Projectile {
 	float x, y;
 	float xvel, yvel;
 	float ttl;
-	struct Sprite *sprite;
 };
 
 /**
@@ -71,6 +69,37 @@ struct Projectile {
 struct World {
 	struct Player player;
 	struct Asteroid asteroids[MAX_ASTEROIDS];
+	size_t asteroid_count;
 	struct Projectile projectiles[MAX_PROJECTILES];
 	struct Enemy enemies[MAX_ENEMIES];
 };
+
+/**
+ * Create and initialize a game world.
+ */
+struct World*
+world_new(void);
+
+/**
+ * Destroy game world.
+ */
+void
+world_destroy(struct World *w);
+
+/**
+ * Add an asteroid into the world.
+ */
+int
+world_add_asteroid(struct World *world, const struct Asteroid *ast);
+
+/**
+ * Add a projectile into the world.
+ */
+void
+world_add_projectile(struct World *w, const struct Projectile *projectile);
+
+/**
+ * Update the world by given delta time.
+ */
+int
+world_update(struct World *world, float dt);
