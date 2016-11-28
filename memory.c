@@ -12,3 +12,9 @@ alloc0(size_t size)
 	memset(bytes, 0, size);
 	return bytes;
 }
+
+void
+destroy(void *data)
+{
+	free(data);
+}

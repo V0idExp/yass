@@ -7,6 +7,7 @@
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
+#include "script.h"
 #include "shader.h"
 #include "sprite.h"
 
@@ -595,6 +596,7 @@ main(int argc, char *argv[])
 	}
 
 	struct World *world = NULL;
+	struct ScriptEnv *env = NULL;
 
 	int ok = load_resources();
 	if (!ok) {
@@ -602,6 +604,13 @@ main(int argc, char *argv[])
 	}
 
 	if (!(world = world_new())) {
+		ok = 0;
+		goto cleanup;
+	}
+
+	// initialize script environment
+	env = script_env_new();
+	if (!env || !script_env_init(env, world)) {
 		ok = 0;
 		goto cleanup;
 	}
@@ -638,6 +647,7 @@ main(int argc, char *argv[])
 	}
 
 cleanup:
+	script_env_destroy(env);
 	world_destroy(world);
 	cleanup_resources();
 	renderer_shutdown(&rndr);

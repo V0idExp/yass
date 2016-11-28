@@ -8,6 +8,9 @@
 void*
 alloc0(size_t size);
 
+void
+destroy(void *data);
+
 /**
  * Allocates given type and zeroes it.
  */
