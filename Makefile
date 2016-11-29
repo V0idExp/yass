@@ -1,5 +1,5 @@
 CFLAGS := $(CFLAGS) -std=c99 -Wall -Werror -g -DDEBUG -I./lua/install/include `sdl2-config --cflags` `pkg-config --cflags glew SDL2_image`
-LDFLAGS := $(LDFLAGS) -L./lua/install/lib -Wl,-Bstatic -Wl,-Bdynamic -llua `sdl2-config --libs` `pkg-config --libs glew SDL2_image`
+LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config --libs glew SDL2_image`
 OS := $(shell uname -s)
 LUA_LIB = lua/install/lib/liblua.a
 LUA_TARGET :=
@@ -7,7 +7,7 @@ OBJS = main.o sprite.o memory.o matlib.o shader.o ioutils.o strutils.o script.o 
 
 ifeq ($(OS), Linux)
 	LUA_TARGET += linux
-	LDFLAGS += -lm -lblas -ldl
+	LDFLAGS += -lm -lblas -ldl -Wl,-Bstatic -Wl,-Bdynamic
 else ifeq ($(OS), Darwin)
 	LUA_TARGET += macosx
 	LDFLAGS += -framework OpenGL -framework Accelerate
