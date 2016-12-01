@@ -264,6 +264,11 @@ world_update(struct World *world, float dt)
 	// flush the event queue
 	world->event_count = 0;
 
+	// check game conditions
+	if (plr->hitpoints <= 0) {
+		return 0;
+	}
+
 	// update player position
 	float distance = dt * plr->speed;
 	if (plr->actions & ACTION_MOVE_LEFT) {
