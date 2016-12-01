@@ -162,7 +162,13 @@ world_destroy(struct World *w)
 int
 world_add_asteroid(struct World *world, struct Asteroid *ast)
 {
-	return list_add(world->asteroid_list, ast);
+	if (!list_add(world->asteroid_list, ast)) {
+		return 0;
+	} else if (!sim_add_body(world->sim, &ast->body)) {
+		list_remove(world->asteroid_list, ast, ptr_cmp);
+		return 0;
+	}
+	return 1;
 }
 
 int
@@ -259,6 +265,8 @@ world_update(struct World *world, float dt)
 		struct Asteroid *ast = ast_node->data;
 		ast->x += ast->xvel * dt;
 		ast->y += ast->yvel * dt;
+		ast->body.x = ast->x;
+		ast->body.y = ast->y;
 		ast->rot += ast->rot_speed * dt;
 		if (ast->rot >= M_PI * 2) {
 			ast->rot -= M_PI * 2;

@@ -13,6 +13,12 @@ asteroid_new(float x, float y, float xvel, float yvel, float rot_speed)
 	ast->xvel = xvel;
 	ast->yvel = yvel;
 	ast->rot_speed = rot_speed;
+	ast->body.x = x;
+	ast->body.y = y;
+	ast->body.radius = 27;
+	ast->body.type = BODY_TYPE_ASTEROID;
+	ast->body.collision_mask = BODY_TYPE_PLAYER;
+	ast->body.userdata = ast;
 	return ast;
 }
 

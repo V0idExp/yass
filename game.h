@@ -66,6 +66,7 @@ struct Asteroid {
 	float xvel, yvel;
 	float rot;
 	float rot_speed;
+	struct Body body;
 };
 
 /**

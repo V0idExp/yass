@@ -1,11 +1,12 @@
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+#include "memory.h"
+#include "script.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include "lua.h"
-#include "lualib.h"
-#include "lauxlib.h"
-#include "memory.h"
-#include "script.h"
 
 struct Arg {
 	int type;
