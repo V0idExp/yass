@@ -31,43 +31,35 @@ add_event(struct World *world, const struct Event *evt)
 static int
 handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 {
-	if (a->type != BODY_TYPE_PLAYER) {
-		return 1;
-	}
-
-	struct Event evt = { 0 };
-	if (b->type == BODY_TYPE_ENEMY) {
-		evt.type = EVENT_ENEMY_HIT;
-		evt.payload = b->userdata;
-	} else if (b->type == BODY_TYPE_ASTEROID) {
-		evt.type = EVENT_ASTEROID_HIT;
-		evt.payload = b->userdata;
-	}
-
-	if (evt.type != 0) {
-		struct World *world = userdata;
-		add_event(world, &evt);
-	}
-
-	return 1;
-}
-
-static int
-handle_projectile_collision(struct Body *a, struct Body *b, void *userdata)
-{
-	if (a->type != BODY_TYPE_PROJECTILE) {
-		return 1;
-	}
-
-	if (b->type == BODY_TYPE_ENEMY) {
+	if (a->type == BODY_TYPE_PLAYER) {
 		struct Event evt = {
-			.type = EVENT_PLAYER_HIT,
-			.payload = b->userdata
+			.type = EVENT_PLAYER_COLLISION,
+			.collision = {
+				.first = a,
+				.second = b
+			}
 		};
 		struct World *world = userdata;
 		add_event(world, &evt);
 	}
+	return 1;
+}
 
+static int
+handle_enemy_hit(struct Body *a, struct Body *b, void *userdata)
+{
+	if (a->type == BODY_TYPE_ENEMY) {
+		struct Event evt = {
+			.type = EVENT_ENEMY_HIT,
+			.hit = {
+				.target = a->userdata,
+				.projectile = b->userdata
+			}
+
+		};
+		struct World *world = userdata;
+		add_event(world, &evt);
+	}
 	return 1;
 }
 
@@ -108,8 +100,8 @@ world_new(void)
 			w
 		},
 		{
-			handle_projectile_collision,
-			BODY_TYPE_PROJECTILE | BODY_TYPE_ENEMY,
+			handle_enemy_hit,
+			BODY_TYPE_ENEMY | BODY_TYPE_PROJECTILE,
 			w
 		},
 		{ NULL }
@@ -235,23 +227,41 @@ world_update(struct World *world, float dt)
 	// process events
 	for (size_t i = 0; i < world->event_count; i++) {
 		struct Event *evt = &world->event_queue[i];
+		struct Enemy *enemy = NULL;
+		struct Asteroid *asteroid = NULL;
+
 		switch (evt->type) {
-		case EVENT_PLAYER_HIT:
+		case EVENT_ENEMY_HIT:
 			printf("enemy hit by player!\n");
-			struct Enemy *enemy = evt->payload;
+			enemy = evt->hit.target;
+			break;
+		case EVENT_PLAYER_COLLISION:
+			switch (evt->collision.second->type) {
+			case BODY_TYPE_ENEMY:
+				printf("player collided with an enemy!\n");
+				enemy = evt->collision.second->userdata;
+				break;
+			case BODY_TYPE_ASTEROID:
+				printf("player collided with an asteroid!\n");
+				asteroid = evt->collision.second->userdata;
+				break;
+			}
+			break;
+		}
+
+		if (enemy) {
+			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
 			sim_remove_body(world->sim, &enemy->body);
 			list_remove(world->enemy_list, enemy, ptr_cmp);
 			enemy_destroy(enemy);
-			break;
-		case EVENT_ENEMY_HIT:
-			printf("player hit by enemy!\n");
-			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
-			break;
-		case EVENT_ASTEROID_HIT:
-			printf("player hit by asteroid!\n");
-			break;
+		} else if (asteroid) {
+			plr->hitpoints -= ASTEROID_COLLISION_DAMAGE;
+			sim_remove_body(world->sim, &asteroid->body);
+			list_remove(world->asteroid_list, asteroid, ptr_cmp);
+			asteroid_destroy(asteroid);
 		}
 	}
+	// flush the event queue
 	world->event_count = 0;
 
 	// update player position

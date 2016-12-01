@@ -43,7 +43,7 @@ enum {
 enum {
 	EVENT_PLAYER_HIT = 1,
 	EVENT_ENEMY_HIT,
-	EVENT_ASTEROID_HIT
+	EVENT_PLAYER_COLLISION,
 };
 
 /**
@@ -93,7 +93,16 @@ struct Projectile {
  */
 struct Event {
 	int type;
-	void *payload;
+	union {
+		struct CollisionEvent {
+			struct Body *first;
+			struct Body *second;
+		} collision;
+		struct HitEvent {
+			void *target;
+			struct Projectile *projectile;
+		} hit;
+	};
 };
 
 /**
