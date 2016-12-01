@@ -229,11 +229,13 @@ world_update(struct World *world, float dt)
 		struct Event *evt = &world->event_queue[i];
 		struct Enemy *enemy = NULL;
 		struct Asteroid *asteroid = NULL;
+		struct Projectile *projectile = NULL;
 
 		switch (evt->type) {
 		case EVENT_ENEMY_HIT:
 			printf("enemy hit by player!\n");
 			enemy = evt->hit.target;
+			projectile = evt->hit.projectile;
 			break;
 		case EVENT_PLAYER_COLLISION:
 			switch (evt->collision.second->type) {
@@ -251,11 +253,17 @@ world_update(struct World *world, float dt)
 			break;
 		}
 
+		if (projectile) {
+			sim_remove_body(world->sim, &projectile->body);
+			list_remove(world->projectile_list, projectile, ptr_cmp);
+			destroy(projectile);
+		}
 		if (enemy) {
 			sim_remove_body(world->sim, &enemy->body);
 			list_remove(world->enemy_list, enemy, ptr_cmp);
 			enemy_destroy(enemy);
-		} else if (asteroid) {
+		}
+		if (asteroid) {
 			sim_remove_body(world->sim, &asteroid->body);
 			list_remove(world->asteroid_list, asteroid, ptr_cmp);
 			asteroid_destroy(asteroid);
