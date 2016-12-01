@@ -172,12 +172,16 @@ enemy_destroy(struct Enemy *enemy);
 
 /**
  * Create an asteroid.
+ *
+ * NOTE: Do not attempt to destroy an object owned by the world.
  */
 struct Asteroid*
 asteroid_new(float x, float y, float xvel, float yvel, float rot_speed);
 
 /**
  * Destroy an asteroid.
+ *
+ * NOTE: Do not attempt to destroy an object owned by the world.
  */
 void
 asteroid_destroy(struct Asteroid *ast);
