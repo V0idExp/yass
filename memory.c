@@ -1,4 +1,5 @@
 #include "memory.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,6 +12,18 @@ alloc0(size_t size)
 	}
 	memset(bytes, 0, size);
 	return bytes;
+}
+
+void*
+copy(const void *ptr, size_t size)
+{
+	assert(ptr != NULL);
+	void *clone = malloc(size);
+	if (!clone) {
+		return NULL;
+	}
+	memcpy(clone, ptr, size);
+	return clone;
 }
 
 void
