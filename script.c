@@ -133,16 +133,17 @@ luafunc_add_enemy(lua_State *state)
 	lua_Number x, y, speed;
 	get_args(state, args, &x, &y, &speed);
 
-	struct Enemy enemy = {
-		.x = x,
-		.y = y,
-		.speed = speed
-	};
+	struct Enemy *enemy = make(struct Enemy);
 	struct World *world = get_world_upvalue(state);
-	int id = world_add_enemy(world, &enemy);
-	lua_pushinteger(state, id);
+	if (!enemy || !world_add_enemy(world, enemy)) {
+		enemy_destroy(enemy);
+		return luaL_error(
+			state,
+			"add_enemy() call failed"
+		);
+	}
 
-	return 1;
+	return 0;
 }
 
 static const luaL_Reg reg[] = {

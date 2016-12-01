@@ -1,11 +1,11 @@
 #pragma once
 
+#include "enemy.h"
 #include "list.h"
 #include "physics.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
-#define MAX_ENEMIES 20
 #define ENEMY_SPEED 50.0  // units/second
 #define ENEMY_INITIAL_HITPOINTS 30.0
 #define ASTEROID_COLLISION_DAMAGE 20
@@ -29,6 +29,15 @@ enum {
 };
 
 /**
+ * Enumeration of body type bits.
+ */
+enum {
+	BODY_TYPE_PLAYER = 1,
+	BODY_TYPE_ENEMY = 1 << 1,
+	BODY_TYPE_ASTEROID = 1 << 2
+};
+
+/**
  * Player.
  */
 struct Player {
@@ -37,19 +46,6 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
-	struct Body body;
-};
-
-/**
- * Enemy.
- */
-struct Enemy {
-	int id;
-	float hitpoints;
-	float x, y;
-	float xvel, yvel;
-	float speed;
-	float rot;
 	struct Body body;
 };
 
@@ -88,7 +84,7 @@ enum {
  */
 struct Event {
 	int type;
-	int entity_hnd;
+	void *payload;
 };
 
 /**
@@ -100,8 +96,7 @@ struct World {
 	struct Player player;
 	struct List *asteroid_list;
 	struct List *projectile_list;
-	struct Enemy enemies[MAX_ENEMIES];
-	size_t enemy_count;
+	struct List *enemy_list;
 
 	struct SimulationSystem *sim;
 
@@ -126,7 +121,7 @@ world_destroy(struct World *w);
  * Add an anemy to the world.
  */
 int
-world_add_enemy(struct World *world, const struct Enemy *enemy);
+world_add_enemy(struct World *world, struct Enemy *enemy);
 
 /**
  * Add an asteroid to the world.

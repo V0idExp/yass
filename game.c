@@ -1,17 +1,9 @@
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
+#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
-
-/**
- * Enumeration of body type bits.
- */
-enum {
-	BODY_TYPE_PLAYER = 1,
-	BODY_TYPE_ENEMY = 1 << 1,
-	BODY_TYPE_ASTEROID = 1 << 2
-};
 
 static void
 add_event(struct World *world, const struct Event *evt)
@@ -44,13 +36,11 @@ handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 
 	struct Event evt = { 0 };
 	if (b->type == BODY_TYPE_ENEMY) {
-		struct Enemy *enemy = b->userdata;
 		evt.type = EVENT_ENEMY_HIT;
-		evt.entity_hnd = enemy->id;
+		evt.payload = b->userdata;
 	} else if (b->type == BODY_TYPE_ASTEROID) {
-		struct Asteroid *ast = b->userdata;
 		evt.type = EVENT_ASTEROID_HIT;
-		evt.entity_hnd = ast->id;
+		evt.payload = b->userdata;
 	}
 
 	if (evt.type != 0) {
@@ -72,8 +62,10 @@ world_new(void)
 	// initialize entity lists
 	w->asteroid_list = list_new();
 	w->projectile_list = list_new();
+	w->enemy_list = list_new();
 	if (!w->asteroid_list ||
-	    !w->projectile_list) {
+	    !w->projectile_list ||
+	    !w->enemy_list) {
 		world_destroy(NULL);
 		return NULL;
 	}
@@ -145,12 +137,18 @@ world_destroy(struct World *w)
 		struct List *lists[] = {
 			w->asteroid_list,
 			w->projectile_list,
+			w->enemy_list,
 			NULL,
+		};
+		void (*destructors[])(void*) = {
+			destroy,
+			destroy,
+			(void(*)(void*))enemy_destroy
 		};
 		for (unsigned i = 0; lists[i] != NULL; i++) {
 			struct ListNode *node = lists[i]->head;
 			while (node) {
-				destroy(node->data);
+				destructors[i](node->data);
 				node = node->next;
 			}
 			list_destroy(lists[i]);
@@ -167,30 +165,15 @@ world_add_asteroid(struct World *world, struct Asteroid *ast)
 }
 
 int
-world_add_enemy(struct World *world, const struct Enemy *enemy)
+world_add_enemy(struct World *world, struct Enemy *enemy)
 {
-	if (world->enemy_count < MAX_ENEMIES) {
-		int i = world->enemy_count++;
-		world->enemies[i] = *enemy;
-		world->enemies[i].hitpoints = ENEMY_INITIAL_HITPOINTS;
-		world->enemies[i].id = i;
-
-		struct Body body = {
-			.x = enemy->x,
-			.y = enemy->y,
-			.radius = 40,
-			.type = BODY_TYPE_ENEMY,
-			.collision_mask = BODY_TYPE_PLAYER,
-			.userdata = &world->enemies[i]
-		};
-		world->enemies[i].body = body;
-		if (!sim_add_body(world->sim, &world->enemies[i].body)) {
-			return -1;
-		}
-
-		return i;
+	if (!list_add(world->enemy_list, enemy)) {
+		return 0;
+	} else if (!sim_add_body(world->sim, &enemy->body)) {
+		list_remove(world->enemy_list, enemy, ptr_cmp);
+		return 0;
 	}
-	return -1;
+	return 1;
 }
 
 int
@@ -219,11 +202,6 @@ world_update(struct World *world, float dt)
 		case EVENT_ENEMY_HIT:
 			printf("player hit by enemy!\n");
 			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
-			world->enemies[evt->entity_hnd].hitpoints = 0;
-			sim_remove_body(
-				world->sim,
-				&world->enemies[evt->entity_hnd].body
-			);
 			break;
 		case EVENT_ASTEROID_HIT:
 			printf("player hit by asteroid!\n");
@@ -267,42 +245,11 @@ world_update(struct World *world, float dt)
 	}
 
 	// update enemies
-	for (int i = 0; i < world->enemy_count; i++) {
-		struct Enemy *enemy = &world->enemies[i];
-		if (enemy->hitpoints <= 0) {
-			continue;
-		}
-
-		// compute direction to target (player)
-		Vec target = vec(plr->x, plr->y, 0, 0);
-		Vec pos = vec(enemy->x, enemy->y, 0, 0);
-		Vec dir;
-		vec_sub(&target, &pos, &dir);
-		vec_norm(&dir);
-
-		// compute desired velocity vector
-		Vec vel;
-		vec_mulf(&dir, enemy->speed, &vel);
-
-		// compute steering vector
-		Vec steer, curr_vel = vec(enemy->xvel, enemy->yvel, 0, 0);
-		vec_sub(&vel, &curr_vel, &steer);
-		vec_clamp(&steer, 0.5);
-
-		// compute new velocity vector
-		vec_add(&curr_vel, &steer, &vel);
-		vec_clamp(&vel, enemy->speed);
-		enemy->xvel = vel.data[0];
-		enemy->yvel = vel.data[1];
-
-		// rotate the enemy to match direction
-		enemy->rot = M_PI / 2 - atan2(vel.data[1], vel.data[0]);
-
-		// update position
-		enemy->x += vel.data[0] * dt;
-		enemy->y += vel.data[1] * dt;
-		enemy->body.x = enemy->x;
-		enemy->body.y = enemy->y;
+	struct ListNode *enemy_node = world->enemy_list->head;
+	while (enemy_node) {
+		// TODO
+		// struct Enemy *enemy = enemy_node->data;
+		enemy_node = enemy_node->next;
 	}
 
 	// update asteroids

@@ -387,14 +387,17 @@ render_world(struct World *world, struct RenderList *rndr_list)
 		prj_node = prj_node->next;
 	}
 
-	for (int i = 0; i < world->enemy_count; i++) {
+	struct ListNode *enemy_node = world->enemy_list->head;
+	while (enemy_node) {
+		struct Enemy *enemy = enemy_node->data;
 		render_list_add_sprite(
 			rndr_list,
 			spr_enemy_01,
-			world->enemies[i].x,
-			world->enemies[i].y,
-			world->enemies[i].rot
+			enemy->x,
+			enemy->y,
+			0
 		);
+		enemy_node = enemy_node->next;
 	}
 
 	return 1;
