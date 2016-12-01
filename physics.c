@@ -1,6 +1,7 @@
 #include "list.h"
 #include "math.h"
 #include "physics.h"
+#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -75,16 +76,10 @@ sim_add_body(struct SimulationSystem *sys, struct Body *body)
 	return list_add(sys->body_list, body);
 }
 
-static int
-body_cmp(const void *a, const void *b)
-{
-	return a == b;
-}
-
 void
 sim_remove_body(struct SimulationSystem *sys, struct Body *body)
 {
-	while (list_remove(sys->body_list, body, body_cmp));
+	while (list_remove(sys->body_list, body, ptr_cmp));
 }
 
 int
