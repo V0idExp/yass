@@ -168,3 +168,15 @@ enemy_new(float x, float y);
  */
 void
 enemy_destroy(struct Enemy *enemy);
+
+/**
+ * Create an asteroid.
+ */
+struct Asteroid*
+asteroid_new(float x, float y, float xvel, float yvel, float rot_speed);
+
+/**
+ * Destroy an asteroid.
+ */
+void
+asteroid_destroy(struct Asteroid *ast);

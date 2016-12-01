@@ -78,11 +78,11 @@ get_world_upvalue(lua_State *state)
  * Add an asteroid.
  *
  * Arguments:
- *     x:        Position x coordinate.
- *     y:        Position y coordinate.
- *     xvel:     Velocity x component.
- *     yvel:     Velocity y component.
- *     rot_spd:  Rotation speed (rad/s).
+ *     x:          Position x coordinate.
+ *     y:          Position y coordinate.
+ *     xvel:       Velocity x component.
+ *     yvel:       Velocity y component.
+ *     rot_speed:  Rotation speed (rad/s).
  */
 static int
 luafunc_add_asteroid(lua_State *state)
@@ -92,21 +92,16 @@ luafunc_add_asteroid(lua_State *state)
 		{ LUA_TNUMBER, "y" },
 		{ LUA_TNUMBER, "xvel" },
 		{ LUA_TNUMBER, "yvel" },
-		{ LUA_TNUMBER, "rot_spd" },
+		{ LUA_TNUMBER, "rot_speed" },
 		{ LUA_TNIL }
 	};
-	lua_Number x, y, xvel, yvel, rot_spd;
-	get_args(state, args, &x, &y, &xvel, &yvel, &rot_spd);
+	lua_Number x, y, xvel, yvel, rot_speed;
+	get_args(state, args, &x, &y, &xvel, &yvel, &rot_speed);
 
 	struct World *world = get_world_upvalue(state);
-	struct Asteroid *ast = make(struct Asteroid);
-	ast->x = x;
-	ast->y = y;
-	ast->xvel = xvel;
-	ast->yvel = yvel;
-	ast->rot_speed = rot_spd;
-
-	if (!world_add_asteroid(world, ast)) {
+	struct Asteroid *ast = asteroid_new(x, y, xvel, yvel, rot_speed);
+	if (!ast || !world_add_asteroid(world, ast)) {
+		asteroid_destroy(ast);
 		return luaL_error(state, "add_asteroid() call failed");
 	}
 
@@ -137,10 +132,7 @@ luafunc_add_enemy(lua_State *state)
 	struct World *world = get_world_upvalue(state);
 	if (!enemy || !world_add_enemy(world, enemy)) {
 		enemy_destroy(enemy);
-		return luaL_error(
-			state,
-			"add_enemy() call failed"
-		);
+		return luaL_error(state, "add_enemy() call failed");
 	}
 
 	return 0;

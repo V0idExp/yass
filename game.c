@@ -1,6 +1,7 @@
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
+#include "types.h"
 #include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -141,9 +142,9 @@ world_destroy(struct World *w)
 			NULL,
 		};
 		void (*destructors[])(void*) = {
+			(DestroyFunc)asteroid_destroy,
 			destroy,
-			destroy,
-			(void(*)(void*))enemy_destroy
+			(DestroyFunc)enemy_destroy
 		};
 		for (unsigned i = 0; lists[i] != NULL; i++) {
 			struct ListNode *node = lists[i]->head;
