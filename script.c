@@ -167,6 +167,8 @@ script_env_new(void)
 
 	luaL_openlibs(env->state);
 
+	env->tick_func = LUA_NOREF;
+
 	// retrieve version and print it
 	lua_getglobal(env->state, "_VERSION");
 	printf("Initialized %s environment\n", lua_tostring(env->state, -1));
@@ -191,7 +193,7 @@ script_env_init(struct ScriptEnv *env, struct World *world)
 }
 
 int
-script_load(struct ScriptEnv *env, const char *filename)
+script_env_load_file(struct ScriptEnv *env, const char *filename)
 {
 	if (luaL_dofile(env->state, filename)) {
 		fprintf(
@@ -205,6 +207,32 @@ script_load(struct ScriptEnv *env, const char *filename)
 #ifdef DEBUG
 	printf("loaded script `%s`\n", filename);
 #endif
+
+	// check whether there's an update function and make a reference for it
+	lua_getglobal(env->state, "tick");
+	if (lua_type(env->state, -1) == LUA_TFUNCTION) {
+		env->tick_func = luaL_ref(env->state, LUA_REGISTRYINDEX);
+	} else {
+		lua_pop(env->state, 1);
+	}
+
+	return 1;
+}
+
+int
+script_env_tick(struct ScriptEnv *env)
+{
+	if (env->tick_func != LUA_NOREF) {
+		lua_rawgeti(env->state, LUA_REGISTRYINDEX, env->tick_func);
+		if (lua_pcall(env->state, 0, 0, 0) != LUA_OK) {
+			fprintf(
+				stderr,
+				"failed to call `update()` script function:\n%s\n",
+				lua_tostring(env->state, -1)
+			);
+			return 0;
+		}
+	}
 	return 1;
 }
 

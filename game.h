@@ -17,6 +17,7 @@
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
 #define PLAYER_PROJECTILE_TTL 5.0  // seconds
 #define SIMULATION_STEP 1.0 / 15
+#define TICK 1.0 // seconds
 #define EVENT_QUEUE_BASE_SIZE 20
 
 /**

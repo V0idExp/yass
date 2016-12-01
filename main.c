@@ -433,13 +433,14 @@ main(int argc, char *argv[])
 
 	// initialize script environment
 	if (!script_env_init(env, world) ||
-	    !script_load(env, "data/scripts/game.lua")) {
+	    !script_env_load_file(env, "data/scripts/game.lua")) {
 		ok = 0;
 		goto cleanup;
 	}
 
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
+	float tick = 0;
 	while (ok && run) {
 		// handle input
 		SDL_Event evt;
@@ -460,6 +461,15 @@ main(int argc, char *argv[])
 		Uint32 now = SDL_GetTicks();
 		float dt = (now - last_update) / 1000.0f;
 		last_update = now;
+		tick += dt;
+
+		// notify script environment
+		while (tick >= TICK) {
+			tick -= TICK;
+			ok &= script_env_tick(env);
+		}
+
+		// update the world
 		run &= world_update(world, dt);
 
 		// render!

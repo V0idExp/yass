@@ -1,6 +1,5 @@
 #pragma once
 
-#include "types.h"
 #include <stddef.h>
 
 #define MAX_BODIES 20
