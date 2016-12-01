@@ -6,7 +6,7 @@
 #include <stdlib.h>
 
 struct SimulationSystem*
-sim_new()
+sim_new(void)
 {
 	struct SimulationSystem *sys = malloc(sizeof(struct SimulationSystem));
 	if (!sys) {
