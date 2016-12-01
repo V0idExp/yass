@@ -26,9 +26,7 @@
 enum {
 	ACTION_MOVE_LEFT = 1,
 	ACTION_MOVE_RIGHT = 1 << 1,
-	ACTION_MOVE_UP = 1 << 2,
-	ACTION_MOVE_DOWN = 1 << 3,
-	ACTION_SHOOT = 1 << 4
+	ACTION_SHOOT = 1 << 2,
 };
 
 /**

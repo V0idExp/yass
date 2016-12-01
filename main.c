@@ -262,14 +262,6 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	case SDLK_RIGHT:
 		act = ACTION_MOVE_RIGHT;
 		break;
-	case SDLK_w:
-	case SDLK_UP:
-		act = ACTION_MOVE_UP;
-		break;
-	case SDLK_s:
-	case SDLK_DOWN:
-		act = ACTION_MOVE_DOWN;
-		break;
 	case SDLK_SPACE:
 		act = ACTION_SHOOT;
 		break;

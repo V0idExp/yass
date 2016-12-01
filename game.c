@@ -229,21 +229,12 @@ world_update(struct World *world, float dt)
 	float distance = dt * plr->speed;
 	if (plr->actions & ACTION_MOVE_LEFT) {
 		plr->x -= distance;
-	}
-	if (plr->actions & ACTION_MOVE_RIGHT) {
+	} else if (plr->actions & ACTION_MOVE_RIGHT) {
 		plr->x += distance;
-	}
-	if (plr->actions & ACTION_MOVE_UP) {
-		plr->y -= distance;
-	}
-	if (plr->actions & ACTION_MOVE_DOWN) {
-		plr->y += distance;
 	}
 
 	// update player body position
 	plr->body.x = plr->x;
-	plr->body.y = plr->y;
-
 
 	// handle shooting
 	plr->shoot_cooldown -= dt;
