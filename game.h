@@ -39,7 +39,7 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
-	int body_hnd;
+	struct Body body;
 };
 
 /**
@@ -52,7 +52,7 @@ struct Enemy {
 	float xvel, yvel;
 	float speed;
 	float rot;
-	int body_hnd;
+	struct Body body;
 };
 
 /**

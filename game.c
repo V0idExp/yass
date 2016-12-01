@@ -89,7 +89,7 @@ world_new(void)
 		{ NULL }
 	};
 	for (int i = 0; handlers[i].callback; i++) {
-		if (sim_add_handler(w->sim, &handlers[i]) < 0) {
+		if (!sim_add_handler(w->sim, &handlers[i])) {
 			world_destroy(w);
 			return NULL;
 		}
@@ -115,8 +115,9 @@ world_new(void)
 		.collision_mask = BODY_TYPE_ENEMY | BODY_TYPE_ASTEROID,
 		.userdata = &w->player
 	};
-	w->player.body_hnd = sim_add_body(w->sim, &player_body);
-	if (w->player.body_hnd < 0) {
+	w->player.body = player_body;
+
+	if (!sim_add_body(w->sim, &w->player.body)) {
 		world_destroy(w);
 		return NULL;
 	}
@@ -153,6 +154,7 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 		int i = world->enemy_count++;
 		world->enemies[i] = *enemy;
 		world->enemies[i].hitpoints = ENEMY_INITIAL_HITPOINTS;
+		world->enemies[i].id = i;
 
 		struct Body body = {
 			.x = enemy->x,
@@ -162,15 +164,11 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 			.collision_mask = BODY_TYPE_PLAYER,
 			.userdata = &world->enemies[i]
 		};
-		world->enemies[i].body_hnd = sim_add_body(
-			world->sim,
-			&body
-		);
-		if (world->enemies[i].body_hnd < 0) {
+		world->enemies[i].body = body;
+		if (!sim_add_body(world->sim, &world->enemies[i].body)) {
 			return -1;
 		}
 
-		world->enemies[i].id = i;
 		return i;
 	}
 	return -1;
@@ -217,7 +215,7 @@ world_update(struct World *world, float dt)
 			world->enemies[evt->entity_hnd].hitpoints = 0;
 			sim_remove_body(
 				world->sim,
-				world->enemies[evt->entity_hnd].body_hnd
+				&world->enemies[evt->entity_hnd].body
 			);
 			break;
 		case EVENT_ASTEROID_HIT:
@@ -243,12 +241,8 @@ world_update(struct World *world, float dt)
 	}
 
 	// update player body position
-	struct Body *player_body = sim_get_body(
-		world->sim,
-		plr->body_hnd
-	);
-	player_body->x = plr->x;
-	player_body->y = plr->y;
+	plr->body.x = plr->x;
+	plr->body.y = plr->y;
 
 
 	// handle shooting
@@ -303,10 +297,8 @@ world_update(struct World *world, float dt)
 		// update position
 		enemy->x += vel.data[0] * dt;
 		enemy->y += vel.data[1] * dt;
-
-		struct Body *body = sim_get_body(world->sim, enemy->body_hnd);
-		body->x = enemy->x;
-		body->y = enemy->y;
+		enemy->body.x = enemy->x;
+		enemy->body.y = enemy->y;
 	}
 
 	// update asteroids

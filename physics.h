@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.h"
 #include <stddef.h>
 
 #define MAX_BODIES 20
@@ -22,8 +23,7 @@ struct CollisionHandler {
 };
 
 struct SimulationSystem {
-	struct Body bodies[MAX_BODIES];
-	char used_bodies[MAX_BODIES];
+	struct List *body_list;
 	struct CollisionHandler handlers[MAX_HANDLERS];
 	size_t handler_count;
 };
@@ -38,14 +38,10 @@ void
 sim_step(struct SimulationSystem *sys, float dt);
 
 int
-sim_add_body(struct SimulationSystem *sys, const struct Body *body);
-
-struct Body*
-sim_get_body(struct SimulationSystem *sys, int hnd);
+sim_add_body(struct SimulationSystem *sys, struct Body *body);
 
 void
-sim_remove_body(struct SimulationSystem *sys, int hnd);
+sim_remove_body(struct SimulationSystem *sys, struct Body *body);
 
 int
-sim_add_handler(struct SimulationSystem *sys, const struct CollisionHandler *hnd);
-
+sim_add_handler(struct SimulationSystem *sys, const struct CollisionHandler *c);

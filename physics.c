@@ -1,25 +1,34 @@
-#include "physics.h"
-#include "memory.h"
+#include "list.h"
 #include "math.h"
+#include "physics.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct SimulationSystem*
-sim_new(void)
+sim_new()
 {
-	struct SimulationSystem *sys = make(struct SimulationSystem);
+	struct SimulationSystem *sys = malloc(sizeof(struct SimulationSystem));
 	if (!sys) {
 		return NULL;
 	}
+	if (!(sys->body_list = list_new())) {
+		free(sys);
+		return NULL;
+	}
+	sys->handler_count = 0;
 	return sys;
 }
 
 void
 sim_destroy(struct SimulationSystem *sys)
 {
-	destroy(sys);
+	if (sys) {
+		list_destroy(sys->body_list);
+		free(sys);
+	}
 }
 
-static int
+static inline int
 check_collision(struct Body *a, struct Body *b)
 {
 	float dist = sqrt(powf(a->x - b->x, 2) + powf(a->y - b->y, 2));
@@ -27,83 +36,63 @@ check_collision(struct Body *a, struct Body *b)
 }
 
 static void
-dispatch_collision(struct CollisionHandler handlers[], struct Body *a, struct Body *b)
+dispatch_collision(struct SimulationSystem *sys, struct Body *a, struct Body *b)
 {
-	for (size_t i = 0; i < MAX_HANDLERS; i++) {
-		if (handlers[i].callback &&
-		    handlers[i].type_mask & a->type &&
-		    handlers[i].type_mask & b->type) {
-			    handlers[i].callback(a, b, handlers[i].userdata);
-		    }
+	for (size_t i = 0; i < sys->handler_count; i++) {
+		struct CollisionHandler h = sys->handlers[i];
+		if (h.callback != NULL &&
+		    h.type_mask & a->type &&
+		    h.type_mask & b->type) {
+			h.callback(a, b, h.userdata);
+		}
 	}
 }
 
 void
 sim_step(struct SimulationSystem *sys, float dt)
 {
-	for (size_t i = 0; i < MAX_BODIES; i++) {
-		if (!sys->used_bodies[i]) {
-			continue;
-		}
-		struct Body *a = &sys->bodies[i];
-
-		for (size_t j = 0; j < MAX_BODIES; j++) {
-			if (!sys->used_bodies[j] || j == i) {
-				continue;
-			}
-			struct Body *b = &sys->bodies[j];
-
-			if (a->type & b->collision_mask &&
+	struct ListNode *node_a = sys->body_list->head;
+	while (node_a) {
+		struct Body *a = node_a->data;
+		struct ListNode *node_b = sys->body_list->head;
+		while (node_b) {
+			struct Body *b = node_b->data;
+			if (a != b &&
+			    a->type & b->collision_mask &&
 			    b->type & a->collision_mask &&
 			    check_collision(a, b)) {
-				dispatch_collision(sys->handlers, a, b);
+				dispatch_collision(sys, a, b);
 			}
+			node_b = node_b->next;
 		}
+		node_a = node_a->next;
 	}
 }
 
 int
-sim_add_body(struct SimulationSystem *sys, const struct Body *body)
+sim_add_body(struct SimulationSystem *sys, struct Body *body)
 {
-	// find unused body slot
-	size_t i;
-	for (i = 0; i < MAX_BODIES; i++) {
-		if (!sys->used_bodies[i]) {
-			break;
-		}
-	}
-	if (i == MAX_BODIES) {
-		return -1;
-	}
-
-	sys->bodies[i] = *body;
-	sys->used_bodies[i] = 1;
-	return i;
+	return list_add(sys->body_list, body);
 }
 
-struct Body*
-sim_get_body(struct SimulationSystem *sys, int hnd)
+static int
+body_cmp(const void *a, const void *b)
 {
-	if (sys->used_bodies[hnd]) {
-		return &sys->bodies[hnd];
-	}
-	return NULL;
+	return a == b;
 }
 
 void
-sim_remove_body(struct SimulationSystem *sys, int hnd)
+sim_remove_body(struct SimulationSystem *sys, struct Body *body)
 {
-	sys->used_bodies[hnd] = 0;
+	while (list_remove(sys->body_list, body, body_cmp));
 }
 
 int
 sim_add_handler(struct SimulationSystem *sys, const struct CollisionHandler *hnd)
 {
-	for (size_t i = 0; i < MAX_HANDLERS; i++) {
-		if (sys->handlers[i].callback == NULL) {
-			sys->handlers[i] = *hnd;
-			return i;
-		}
+	if (sys->handler_count < MAX_HANDLERS) {
+		sys->handlers[sys->handler_count++] = *hnd;
+		return 1;
 	}
-	return -1;
+	return 0;
 }
