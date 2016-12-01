@@ -71,7 +71,9 @@ world_new(void)
 
 	// initialize entity lists
 	w->asteroid_list = list_new();
-	if (!w->asteroid_list) {
+	w->projectile_list = list_new();
+	if (!w->asteroid_list ||
+	    !w->projectile_list) {
 		world_destroy(NULL);
 		return NULL;
 	}
@@ -139,14 +141,19 @@ world_destroy(struct World *w)
 		free(w->event_queue);
 		sim_destroy(w->sim);
 
-		// destroy asteroids
-		{
-			struct ListNode *node = w->asteroid_list->head;
+		// destroy entities
+		struct List *lists[] = {
+			w->asteroid_list,
+			w->projectile_list,
+			NULL,
+		};
+		for (unsigned i = 0; lists[i] != NULL; i++) {
+			struct ListNode *node = lists[i]->head;
 			while (node) {
 				destroy(node->data);
 				node = node->next;
 			}
-			list_destroy(w->asteroid_list);
+			list_destroy(lists[i]);
 		}
 
 		destroy(w);
@@ -186,22 +193,10 @@ world_add_enemy(struct World *world, const struct Enemy *enemy)
 	return -1;
 }
 
-void
-world_add_projectile(struct World *w, const struct Projectile *projectile)
+int
+world_add_projectile(struct World *w, struct Projectile *projectile)
 {
-	size_t oldest = 0;
-	float oldest_ttl = PLAYER_PROJECTILE_TTL;
-	for (size_t i = 0; i < MAX_PROJECTILES; i++) {
-		if (w->projectiles[i].ttl <= 0) {
-			w->projectiles[i] = *projectile;
-			w->projectiles[i].id = i;
-			return;
-		} else if (w->projectiles[i].ttl < oldest_ttl) {
-			oldest_ttl = w->projectiles[i].ttl;
-			oldest = i;
-		}
-	}
-	w->projectiles[oldest] = *projectile;
+	return list_add(w->projectile_list, projectile);
 }
 
 int
@@ -254,15 +249,21 @@ world_update(struct World *world, float dt)
 	    plr->shoot_cooldown <= 0) {
 		// reset cooldown timer
 		plr->shoot_cooldown = 1.0 / PLAYER_ACTION_SHOOT_RATE;
-		// shoot
-		struct Projectile p = {
-			.x = plr->x,
-			.y = plr->y,
-			.xvel = 0,
-			.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED,
-			.ttl = PLAYER_PROJECTILE_TTL
-		};
-		world_add_projectile(world, &p);
+
+		// shoot a projectile
+		struct Projectile *prj = make(struct Projectile);
+		if (!prj) {
+			// TODO: set error
+			return 0;
+		}
+		prj->x = plr->x;
+		prj->y = plr->y;
+		prj->xvel = 0;
+		prj->yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
+		prj->ttl = PLAYER_PROJECTILE_TTL;
+
+		// TODO: handle the error
+		world_add_projectile(world, prj);
 	}
 
 	// update enemies
@@ -318,13 +319,15 @@ world_update(struct World *world, float dt)
 	}
 
 	// update projectiles
-	for (int i = 0; i < MAX_PROJECTILES; i++) {
-		struct Projectile *prj = &world->projectiles[i];
+	struct ListNode *prj_node = world->projectile_list->head;
+	while (prj_node) {
+		struct Projectile *prj = prj_node->data;
 		if (prj->ttl > 0) {
 			prj->x += prj->xvel * dt;
 			prj->y += prj->yvel * dt;
 			prj->ttl -= dt;
 		}
+		prj_node = prj_node->next;
 	}
 
 	return 1;

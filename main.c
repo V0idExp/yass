@@ -372,8 +372,9 @@ render_world(struct World *world, struct RenderList *rndr_list)
 		ast_node = ast_node->next;
 	}
 
-	for (int i = 0; i < MAX_PROJECTILES; i++) {
-		struct Projectile *prj = &world->projectiles[i];
+	struct ListNode *prj_node = world->projectile_list->head;
+	while (prj_node) {
+		struct Projectile *prj = prj_node->data;
 		if (prj->ttl > 0) {
 			render_list_add_sprite(
 				rndr_list,
@@ -383,6 +384,7 @@ render_world(struct World *world, struct RenderList *rndr_list)
 				0
 			);
 		}
+		prj_node = prj_node->next;
 	}
 
 	for (int i = 0; i < world->enemy_count; i++) {

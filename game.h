@@ -5,7 +5,6 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
-#define MAX_PROJECTILES 20
 #define MAX_ENEMIES 20
 #define ENEMY_SPEED 50.0  // units/second
 #define ENEMY_INITIAL_HITPOINTS 30.0
@@ -100,7 +99,7 @@ struct Event {
 struct World {
 	struct Player player;
 	struct List *asteroid_list;
-	struct Projectile projectiles[MAX_PROJECTILES];
+	struct List *projectile_list;
 	struct Enemy enemies[MAX_ENEMIES];
 	size_t enemy_count;
 
@@ -136,10 +135,10 @@ int
 world_add_asteroid(struct World *world, struct Asteroid *ast);
 
 /**
- * Add a projectile tp the world.
+ * Add a projectile to the world.
  */
-void
-world_add_projectile(struct World *w, const struct Projectile *projectile);
+int
+world_add_projectile(struct World *w, struct Projectile *projectile);
 
 /**
  * Update the world by given delta time.
