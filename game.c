@@ -238,6 +238,10 @@ world_update(struct World *world, float dt)
 		switch (evt->type) {
 		case EVENT_PLAYER_HIT:
 			printf("enemy hit by player!\n");
+			struct Enemy *enemy = evt->payload;
+			sim_remove_body(world->sim, &enemy->body);
+			list_remove(world->enemy_list, enemy, ptr_cmp);
+			enemy_destroy(enemy);
 			break;
 		case EVENT_ENEMY_HIT:
 			printf("player hit by enemy!\n");
