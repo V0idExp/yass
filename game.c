@@ -52,6 +52,25 @@ handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 	return 1;
 }
 
+static int
+handle_projectile_collision(struct Body *a, struct Body *b, void *userdata)
+{
+	if (a->type != BODY_TYPE_PROJECTILE) {
+		return 1;
+	}
+
+	if (b->type == BODY_TYPE_ENEMY) {
+		struct Event evt = {
+			.type = EVENT_PLAYER_HIT,
+			.payload = b->userdata
+		};
+		struct World *world = userdata;
+		add_event(world, &evt);
+	}
+
+	return 1;
+}
+
 struct World*
 world_new(void)
 {
@@ -86,6 +105,11 @@ world_new(void)
 		{
 			handle_player_collision,
 			BODY_TYPE_PLAYER | BODY_TYPE_ASTEROID,
+			w
+		},
+		{
+			handle_projectile_collision,
+			BODY_TYPE_PROJECTILE | BODY_TYPE_ENEMY,
 			w
 		},
 		{ NULL }
@@ -184,9 +208,15 @@ world_add_enemy(struct World *world, struct Enemy *enemy)
 }
 
 int
-world_add_projectile(struct World *w, struct Projectile *projectile)
+world_add_projectile(struct World *world, struct Projectile *projectile)
 {
-	return list_add(w->projectile_list, projectile);
+	if (!list_add(world->projectile_list, projectile)) {
+		return 0;
+	} else if (!sim_add_body(world->sim, &projectile->body)) {
+		list_remove(world->projectile_list, projectile, ptr_cmp);
+		return 0;
+	}
+	return 1;
 }
 
 int
@@ -206,6 +236,9 @@ world_update(struct World *world, float dt)
 	for (size_t i = 0; i < world->event_count; i++) {
 		struct Event *evt = &world->event_queue[i];
 		switch (evt->type) {
+		case EVENT_PLAYER_HIT:
+			printf("enemy hit by player!\n");
+			break;
 		case EVENT_ENEMY_HIT:
 			printf("player hit by enemy!\n");
 			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
@@ -246,6 +279,12 @@ world_update(struct World *world, float dt)
 		prj->xvel = 0;
 		prj->yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
 		prj->ttl = PLAYER_PROJECTILE_TTL;
+		prj->body.x = plr->x;
+		prj->body.y = plr->y;
+		prj->body.radius = 4;
+		prj->body.type = BODY_TYPE_PROJECTILE;
+		prj->body.collision_mask = BODY_TYPE_ENEMY;
+		prj->body.userdata = prj;
 
 		// TODO: handle the error
 		world_add_projectile(world, prj);
@@ -282,6 +321,8 @@ world_update(struct World *world, float dt)
 			prj->x += prj->xvel * dt;
 			prj->y += prj->yvel * dt;
 			prj->ttl -= dt;
+			prj->body.x = prj->x;
+			prj->body.y = prj->y;
 		}
 		prj_node = prj_node->next;
 	}

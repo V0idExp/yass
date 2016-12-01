@@ -7,7 +7,7 @@ timeline = {
         game.add_asteroid(380.11, 340.1, -20, -20, 0.85)
 
         -- Add an enemy
-        game.add_enemy(0, -350, 50)
+        game.add_enemy(0, -350)
     end,
 
     [5] = function()

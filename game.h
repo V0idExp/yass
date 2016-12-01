@@ -33,7 +33,17 @@ enum {
 enum {
 	BODY_TYPE_PLAYER = 1,
 	BODY_TYPE_ENEMY = 1 << 1,
-	BODY_TYPE_ASTEROID = 1 << 2
+	BODY_TYPE_ASTEROID = 1 << 2,
+	BODY_TYPE_PROJECTILE = 1 << 3,
+};
+
+/**
+ * Game event types.
+ */
+enum {
+	EVENT_PLAYER_HIT = 1,
+	EVENT_ENEMY_HIT,
+	EVENT_ASTEROID_HIT
 };
 
 /**
@@ -61,7 +71,6 @@ struct Enemy {
  * Asteroid.
  */
 struct Asteroid {
-	int id;
 	float x, y;
 	float xvel, yvel;
 	float rot;
@@ -73,19 +82,10 @@ struct Asteroid {
  * Projectile.
  */
 struct Projectile {
-	int id;
 	float x, y;
 	float xvel, yvel;
 	float ttl;
-};
-
-/**
- * Game event types.
- */
-enum {
-	EVENT_PLAYER_HIT = 1,
-	EVENT_ENEMY_HIT,
-	EVENT_ASTEROID_HIT
+	struct Body body;
 };
 
 /**
@@ -148,7 +148,7 @@ world_add_asteroid(struct World *world, struct Asteroid *ast);
  * NOTE: This function takes the ownership of the object.
  */
 int
-world_add_projectile(struct World *w, struct Projectile *projectile);
+world_add_projectile(struct World *world, struct Projectile *projectile);
 
 /**
  * Update the world by given delta time.

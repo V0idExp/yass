@@ -13,9 +13,9 @@ enemy_new(float x, float y)
 	enemy->hitpoints = ENEMY_INITIAL_HITPOINTS;
 	enemy->body.x = x;
 	enemy->body.y = y;
-	enemy->body.radius = 40;
+	enemy->body.radius = 48;
 	enemy->body.type = BODY_TYPE_ENEMY;
-	enemy->body.collision_mask = BODY_TYPE_PLAYER;
+	enemy->body.collision_mask = BODY_TYPE_PLAYER | BODY_TYPE_PROJECTILE;
 	enemy->body.userdata = enemy;
 	return enemy;
 }
