@@ -1,6 +1,5 @@
 #pragma once
 
-#include "enemy.h"
 #include "list.h"
 #include "physics.h"
 
@@ -46,6 +45,15 @@ struct Player {
 	int actions;    // actions bitmask
 	float speed;    // speed in units/second
 	float shoot_cooldown;
+	struct Body body;
+};
+
+/**
+ * Enemy.
+ */
+struct Enemy {
+	float x, y;
+	float hitpoints;
 	struct Body body;
 };
 
@@ -119,18 +127,24 @@ world_destroy(struct World *w);
 
 /**
  * Add an anemy to the world.
+ *
+ * NOTE: This function takes the ownership of the object.
  */
 int
 world_add_enemy(struct World *world, struct Enemy *enemy);
 
 /**
  * Add an asteroid to the world.
+ *
+ * NOTE: This function takes the ownership of the object.
  */
 int
 world_add_asteroid(struct World *world, struct Asteroid *ast);
 
 /**
  * Add a projectile to the world.
+ *
+ * NOTE: This function takes the ownership of the object.
  */
 int
 world_add_projectile(struct World *w, struct Projectile *projectile);
@@ -140,3 +154,17 @@ world_add_projectile(struct World *w, struct Projectile *projectile);
  */
 int
 world_update(struct World *world, float dt);
+
+/**
+ * Create an enemy.
+ */
+struct Enemy*
+enemy_new(float x, float y);
+
+/**
+ * Destroy an enemy.
+ *
+ * NOTE: Do not attempt to destroy an object owned by the world.
+ */
+void
+enemy_destroy(struct Enemy *enemy);
