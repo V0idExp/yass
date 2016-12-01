@@ -1,10 +1,10 @@
 #pragma once
 
+#include "list.h"
 #include "physics.h"
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
-#define MAX_ASTEROIDS 100
 #define MAX_PROJECTILES 20
 #define MAX_ENEMIES 20
 #define ENEMY_SPEED 50.0  // units/second
@@ -99,8 +99,7 @@ struct Event {
  */
 struct World {
 	struct Player player;
-	struct Asteroid asteroids[MAX_ASTEROIDS];
-	size_t asteroid_count;
+	struct List *asteroid_list;
 	struct Projectile projectiles[MAX_PROJECTILES];
 	struct Enemy enemies[MAX_ENEMIES];
 	size_t enemy_count;
@@ -134,7 +133,7 @@ world_add_enemy(struct World *world, const struct Enemy *enemy);
  * Add an asteroid to the world.
  */
 int
-world_add_asteroid(struct World *world, const struct Asteroid *ast);
+world_add_asteroid(struct World *world, struct Asteroid *ast);
 
 /**
  * Add a projectile tp the world.

@@ -1,15 +1,15 @@
-#include <GL/glew.h>
-#include <SDL.h>
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
 #include "script.h"
 #include "shader.h"
 #include "sprite.h"
+#include <GL/glew.h>
+#include <SDL.h>
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define RENDER_LIST_MAX_LEN 1000
 
@@ -359,14 +359,17 @@ render_world(struct World *world, struct RenderList *rndr_list)
 		0.0f
 	);
 
-	for (int i = 0; i < world->asteroid_count; i++) {
+	struct ListNode *ast_node = world->asteroid_list->head;
+	while (ast_node) {
+		struct Asteroid *ast = ast_node->data;
 		render_list_add_sprite(
 			rndr_list,
 			spr_asteroid_01,
-			world->asteroids[i].x,
-			world->asteroids[i].y,
-			world->asteroids[i].rot
+			ast->x,
+			ast->y,
+			ast->rot
 		);
+		ast_node = ast_node->next;
 	}
 
 	for (int i = 0; i < MAX_PROJECTILES; i++) {

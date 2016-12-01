@@ -99,18 +99,18 @@ luafunc_add_asteroid(lua_State *state)
 	get_args(state, args, &x, &y, &xvel, &yvel, &rot_spd);
 
 	struct World *world = get_world_upvalue(state);
-	struct Asteroid ast = {
-		.x = x,
-		.y = y,
-		.xvel = xvel,
-		.yvel = yvel,
-		.rot_speed = rot_spd
-	};
-	int idx = world_add_asteroid(world, &ast);
+	struct Asteroid *ast = make(struct Asteroid);
+	ast->x = x;
+	ast->y = y;
+	ast->xvel = xvel;
+	ast->yvel = yvel;
+	ast->rot_speed = rot_spd;
 
-	lua_pushinteger(state, idx);
+	if (!world_add_asteroid(world, ast)) {
+		return luaL_error(state, "add_asteroid() call failed");
+	}
 
-	return 1;
+	return 0;
 }
 
 /**

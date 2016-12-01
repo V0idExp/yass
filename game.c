@@ -1,8 +1,8 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 /**
  * Enumeration of body type bits.
@@ -69,6 +69,13 @@ world_new(void)
 		return NULL;
 	}
 
+	// initialize entity lists
+	w->asteroid_list = list_new();
+	if (!w->asteroid_list) {
+		world_destroy(NULL);
+		return NULL;
+	}
+
 	// initialize simulation system and register collision callbacks
 	w->sim = sim_new();
 	if (!w->sim) {
@@ -131,20 +138,25 @@ world_destroy(struct World *w)
 	if (w) {
 		free(w->event_queue);
 		sim_destroy(w->sim);
+
+		// destroy asteroids
+		{
+			struct ListNode *node = w->asteroid_list->head;
+			while (node) {
+				destroy(node->data);
+				node = node->next;
+			}
+			list_destroy(w->asteroid_list);
+		}
+
 		destroy(w);
 	}
 }
 
 int
-world_add_asteroid(struct World *world, const struct Asteroid *ast)
+world_add_asteroid(struct World *world, struct Asteroid *ast)
 {
-	if (world->asteroid_count < MAX_ASTEROIDS) {
-		int i = world->asteroid_count++;
-		world->asteroids[i] = *ast;
-		world->asteroids[i].id = i;
-		return i;
-	}
-	return -1;
+	return list_add(world->asteroid_list, ast);
 }
 
 int
@@ -293,14 +305,16 @@ world_update(struct World *world, float dt)
 	}
 
 	// update asteroids
-	for (int i = 0; i < world->asteroid_count; i++) {
-		struct Asteroid *ast = &world->asteroids[i];
+	struct ListNode *ast_node = world->asteroid_list->head;
+	while (ast_node) {
+		struct Asteroid *ast = ast_node->data;
 		ast->x += ast->xvel * dt;
 		ast->y += ast->yvel * dt;
 		ast->rot += ast->rot_speed * dt;
 		if (ast->rot >= M_PI * 2) {
 			ast->rot -= M_PI * 2;
 		}
+		ast_node = ast_node->next;
 	}
 
 	// update projectiles
