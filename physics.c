@@ -54,7 +54,12 @@ sim_step(struct SimulationSystem *sys, float dt)
 {
 	struct ListNode *node_a = sys->body_list->head;
 	while (node_a) {
+		// move bodies
 		struct Body *a = node_a->data;
+		a->x += a->xvel * dt;
+		a->y += a->yvel * dt;
+
+		// check for collisions
 		struct ListNode *node_b = sys->body_list->head;
 		while (node_b) {
 			struct Body *b = node_b->data;

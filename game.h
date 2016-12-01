@@ -14,7 +14,7 @@
 #define PLAYER_ACTION_SHOOT_RATE 1.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
 #define PLAYER_PROJECTILE_TTL 5.0  // seconds
-#define SIMULATION_STEP 1.0 / 15
+#define SIMULATION_STEP 1.0 / 30
 #define TICK 1.0 // seconds
 #define EVENT_QUEUE_BASE_SIZE 20
 
@@ -72,7 +72,6 @@ struct Enemy {
  */
 struct Asteroid {
 	float x, y;
-	float xvel, yvel;
 	float rot;
 	float rot_speed;
 	struct Body body;
@@ -83,7 +82,6 @@ struct Asteroid {
  */
 struct Projectile {
 	float x, y;
-	float xvel, yvel;
 	float ttl;
 	struct Body body;
 };

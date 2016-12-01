@@ -10,9 +10,9 @@ asteroid_new(float x, float y, float xvel, float yvel, float rot_speed)
 	}
 	ast->x = x;
 	ast->y = y;
-	ast->xvel = xvel;
-	ast->yvel = yvel;
 	ast->rot_speed = rot_speed;
+	ast->body.xvel = xvel;
+	ast->body.yvel = yvel;
 	ast->body.x = x;
 	ast->body.y = y;
 	ast->body.radius = 13;

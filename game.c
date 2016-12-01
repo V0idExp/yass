@@ -239,10 +239,12 @@ world_update(struct World *world, float dt)
 			switch (evt->collision.second->type) {
 			case BODY_TYPE_ENEMY:
 				printf("player collided with an enemy!\n");
+				plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
 				enemy = evt->collision.second->userdata;
 				break;
 			case BODY_TYPE_ASTEROID:
 				printf("player collided with an asteroid!\n");
+				plr->hitpoints -= ASTEROID_COLLISION_DAMAGE;
 				asteroid = evt->collision.second->userdata;
 				break;
 			}
@@ -250,12 +252,10 @@ world_update(struct World *world, float dt)
 		}
 
 		if (enemy) {
-			plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
 			sim_remove_body(world->sim, &enemy->body);
 			list_remove(world->enemy_list, enemy, ptr_cmp);
 			enemy_destroy(enemy);
 		} else if (asteroid) {
-			plr->hitpoints -= ASTEROID_COLLISION_DAMAGE;
 			sim_remove_body(world->sim, &asteroid->body);
 			list_remove(world->asteroid_list, asteroid, ptr_cmp);
 			asteroid_destroy(asteroid);
@@ -295,9 +295,9 @@ world_update(struct World *world, float dt)
 		}
 		prj->x = plr->x;
 		prj->y = plr->y;
-		prj->xvel = 0;
-		prj->yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
 		prj->ttl = PLAYER_PROJECTILE_TTL;
+		prj->body.xvel = 0;
+		prj->body.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
 		prj->body.x = plr->x;
 		prj->body.y = plr->y;
 		prj->body.radius = 4;
@@ -321,15 +321,17 @@ world_update(struct World *world, float dt)
 	struct ListNode *ast_node = world->asteroid_list->head;
 	while (ast_node) {
 		struct Asteroid *ast = ast_node->data;
-		ast->x += ast->xvel * dt;
-		ast->y += ast->yvel * dt;
-		ast->body.x = ast->x;
-		ast->body.y = ast->y;
+		ast_node = ast_node->next;
+
+		// update position
+		ast->x = ast->body.x;
+		ast->y = ast->body.y;
+
+		// update rotation
 		ast->rot += ast->rot_speed * dt;
 		if (ast->rot >= M_PI * 2) {
 			ast->rot -= M_PI * 2;
 		}
-		ast_node = ast_node->next;
 	}
 
 	// update projectiles
@@ -337,11 +339,12 @@ world_update(struct World *world, float dt)
 	while (prj_node) {
 		struct Projectile *prj = prj_node->data;
 		if (prj->ttl > 0) {
-			prj->x += prj->xvel * dt;
-			prj->y += prj->yvel * dt;
+			// update position
+			prj->x = prj->body.x;
+			prj->y = prj->body.y;
+
+			// update time-to-live
 			prj->ttl -= dt;
-			prj->body.x = prj->x;
-			prj->body.y = prj->y;
 		}
 		prj_node = prj_node->next;
 	}

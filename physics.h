@@ -7,6 +7,7 @@
 
 struct Body {
 	float x, y;
+	float xvel, yvel;
 	float radius;
 	int type;
 	int collision_mask;
