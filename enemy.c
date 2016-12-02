@@ -11,6 +11,7 @@ enemy_new(float x, float y)
 	enemy->x = x;
 	enemy->y = y;
 	enemy->hitpoints = ENEMY_INITIAL_HITPOINTS;
+	enemy->ttl = ENEMY_TTL;
 	enemy->body.x = x;
 	enemy->body.y = y;
 	enemy->body.radius = 48;

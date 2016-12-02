@@ -64,3 +64,26 @@ list_remove(struct List *list, void *data, CompareFunc cmp)
 	}
 	return 0;
 }
+
+void
+list_filter(struct List *list, FilterFunc filter, void *userdata)
+{
+	assert(list != NULL);
+	struct ListNode *node = list->head, *prev = NULL, *tmp;
+	while (node) {
+		if (filter(node->data, userdata) == 0) {
+			if (prev) {
+				prev->next = node->next;
+			} else {
+				list->head = node->next;
+			}
+			tmp = node;
+			node = node->next;
+			list->len--;
+			free(tmp);
+		} else {
+			prev = node;
+			node = node->next;
+		}
+	}
+}

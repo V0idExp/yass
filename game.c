@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+struct UpdateContext {
+	struct World *world;
+	float dt;
+};
+
 static void
 add_event(struct World *world, const struct Event *evt)
 {
@@ -211,6 +216,67 @@ world_add_projectile(struct World *world, struct Projectile *projectile)
 	return 1;
 }
 
+static int
+update_enemy(void *enemy_ptr, void *ctx_ptr)
+{
+	struct Enemy *enemy = enemy_ptr;
+	struct UpdateContext *ctx = ctx_ptr;
+
+	// check enemy conditions and TTL and if not satisfied, destroy it and
+	// remove from the list
+	if (enemy->hitpoints <= 0 ||
+	    (enemy->ttl -= ctx->dt) <= 0) {
+		sim_remove_body(ctx->world->sim, &enemy->body);
+		enemy_destroy(enemy);
+		return 0;
+	}
+	return 1;
+}
+
+static int
+update_asteroid(void *ast_ptr, void *ctx_ptr)
+{
+	struct Asteroid *ast = ast_ptr;
+	struct UpdateContext *ctx = ctx_ptr;
+
+	// destroy and filter out the asteroid from list if its TTL expired
+	if ((ast->ttl -= ctx->dt) <= 0) {
+		sim_remove_body(ctx->world->sim, &ast->body);
+		asteroid_destroy(ast);
+		return 0;
+	}
+
+	// update position
+	ast->x = ast->body.x;
+	ast->y = ast->body.y;
+
+	// update rotation
+	ast->rot += ast->rot_speed * ctx->dt;
+	if (ast->rot >= M_PI * 2) {
+		ast->rot -= M_PI * 2;
+	}
+
+	return 1;
+}
+
+static int
+update_projectile(void *prj_ptr, void *ctx_ptr)
+{
+	struct Projectile *prj = prj_ptr;
+	struct UpdateContext *ctx = ctx_ptr;
+	if ((prj->ttl -= ctx->dt) <= 0) {
+		sim_remove_body(ctx->world->sim, &prj->body);
+		free(prj);
+		return 0;
+	}
+
+	// update position
+	prj->x = prj->body.x;
+	prj->y = prj->body.y;
+
+	return 1;
+}
+
 int
 world_update(struct World *world, float dt)
 {
@@ -227,15 +293,17 @@ world_update(struct World *world, float dt)
 	// process events
 	for (size_t i = 0; i < world->event_count; i++) {
 		struct Event *evt = &world->event_queue[i];
-		struct Enemy *enemy = NULL;
-		struct Asteroid *asteroid = NULL;
-		struct Projectile *projectile = NULL;
+		struct Enemy *enemy;
+		struct Projectile *prj = NULL;
+		struct Asteroid *ast = NULL;
 
 		switch (evt->type) {
 		case EVENT_ENEMY_HIT:
 			printf("enemy hit by player!\n");
 			enemy = evt->hit.target;
-			projectile = evt->hit.projectile;
+			enemy->hitpoints -= PLAYER_INITIAL_DAMAGE;
+			prj = evt->hit.projectile;
+			prj->ttl = 0;
 			break;
 		case EVENT_PLAYER_COLLISION:
 			switch (evt->collision.second->type) {
@@ -243,30 +311,16 @@ world_update(struct World *world, float dt)
 				printf("player collided with an enemy!\n");
 				plr->hitpoints -= ENEMY_COLLISION_DAMAGE;
 				enemy = evt->collision.second->userdata;
+				enemy->hitpoints = 0;
 				break;
 			case BODY_TYPE_ASTEROID:
 				printf("player collided with an asteroid!\n");
 				plr->hitpoints -= ASTEROID_COLLISION_DAMAGE;
-				asteroid = evt->collision.second->userdata;
+				ast = evt->collision.second->userdata;
+				ast->ttl = 0;
 				break;
 			}
 			break;
-		}
-
-		if (projectile) {
-			sim_remove_body(world->sim, &projectile->body);
-			list_remove(world->projectile_list, projectile, ptr_cmp);
-			destroy(projectile);
-		}
-		if (enemy) {
-			sim_remove_body(world->sim, &enemy->body);
-			list_remove(world->enemy_list, enemy, ptr_cmp);
-			enemy_destroy(enemy);
-		}
-		if (asteroid) {
-			sim_remove_body(world->sim, &asteroid->body);
-			list_remove(world->asteroid_list, asteroid, ptr_cmp);
-			asteroid_destroy(asteroid);
 		}
 	}
 	// flush the event queue
@@ -317,45 +371,19 @@ world_update(struct World *world, float dt)
 		world_add_projectile(world, prj);
 	}
 
+	struct UpdateContext ctx = {
+		world,
+		dt
+	};
+
 	// update enemies
-	struct ListNode *enemy_node = world->enemy_list->head;
-	while (enemy_node) {
-		// TODO
-		// struct Enemy *enemy = enemy_node->data;
-		enemy_node = enemy_node->next;
-	}
+	list_filter(world->enemy_list, update_enemy, &ctx);
 
 	// update asteroids
-	struct ListNode *ast_node = world->asteroid_list->head;
-	while (ast_node) {
-		struct Asteroid *ast = ast_node->data;
-		ast_node = ast_node->next;
-
-		// update position
-		ast->x = ast->body.x;
-		ast->y = ast->body.y;
-
-		// update rotation
-		ast->rot += ast->rot_speed * dt;
-		if (ast->rot >= M_PI * 2) {
-			ast->rot -= M_PI * 2;
-		}
-	}
+	list_filter(world->asteroid_list, update_asteroid, &ctx);
 
 	// update projectiles
-	struct ListNode *prj_node = world->projectile_list->head;
-	while (prj_node) {
-		struct Projectile *prj = prj_node->data;
-		if (prj->ttl > 0) {
-			// update position
-			prj->x = prj->body.x;
-			prj->y = prj->body.y;
-
-			// update time-to-live
-			prj->ttl -= dt;
-		}
-		prj_node = prj_node->next;
-	}
+	list_filter(world->projectile_list, update_projectile, &ctx);
 
 	return 1;
 }

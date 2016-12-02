@@ -5,18 +5,23 @@
 
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 800
-#define ENEMY_SPEED 50.0  // units/second
-#define ENEMY_INITIAL_HITPOINTS 30.0
-#define ASTEROID_COLLISION_DAMAGE 20
-#define ENEMY_COLLISION_DAMAGE 50
-#define PLAYER_INITIAL_HITPOINTS 100.0
-#define PLAYER_INITIAL_SPEED 200.0  // units/second
-#define PLAYER_ACTION_SHOOT_RATE 1.0  // projectiles/second
-#define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
-#define PLAYER_PROJECTILE_TTL 5.0  // seconds
 #define SIMULATION_STEP 1.0 / 30
 #define TICK 1.0 // seconds
 #define EVENT_QUEUE_BASE_SIZE 20
+
+#define ENEMY_INITIAL_HITPOINTS 30.0
+#define ENEMY_TTL 5.0 // seconds
+#define ENEMY_COLLISION_DAMAGE 50
+
+#define ASTEROID_TTL 20.0 // seconds
+#define ASTEROID_COLLISION_DAMAGE 20
+
+#define PLAYER_INITIAL_HITPOINTS 100.0
+#define PLAYER_INITIAL_DAMAGE 10.0
+#define PLAYER_INITIAL_SPEED 200.0  // units/second
+#define PLAYER_ACTION_SHOOT_RATE 2.0  // projectiles/second
+#define PLAYER_PROJECTILE_INITIAL_SPEED 400  // units/second
+#define PLAYER_PROJECTILE_TTL 5.0  // seconds
 
 /**
  * Player action bits.
@@ -64,6 +69,7 @@ struct Player {
 struct Enemy {
 	float x, y;
 	float hitpoints;
+	float ttl;
 	struct Body body;
 };
 
@@ -74,6 +80,7 @@ struct Asteroid {
 	float x, y;
 	float rot;
 	float rot_speed;
+	float ttl;
 	struct Body body;
 };
 
