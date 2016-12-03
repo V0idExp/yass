@@ -431,9 +431,10 @@ main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	// initialize script environment
+	// initialize script environment and perform initial tick
 	if (!script_env_init(env, world) ||
-	    !script_env_load_file(env, "data/scripts/game.lua")) {
+	    !script_env_load_file(env, "data/scripts/game.lua") ||
+	    !script_env_tick(env)) {
 		ok = 0;
 		goto cleanup;
 	}

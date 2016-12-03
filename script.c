@@ -143,6 +143,16 @@ static const luaL_Reg reg[] = {
 	{ NULL, NULL }
 };
 
+static const struct {
+	const char *name;
+	lua_Number value;
+} game_constants[] = {
+	{ "SCROLL_SPEED", SCROLL_SPEED },
+	{ "SCREEN_WIDTH", SCREEN_WIDTH },
+	{ "SCREEN_HEIGHT", SCREEN_HEIGHT },
+	{ NULL }
+};
+
 struct ScriptEnv*
 script_env_new(void)
 {
@@ -175,10 +185,21 @@ script_env_init(struct ScriptEnv *env, struct World *world)
 	assert(env);
 	assert(world);
 
-	// create library with game functions
+	// create game library
 	luaL_newlibtable(env->state, reg);
+	int game_table = lua_gettop(env->state);
+
+	// register functions
 	lua_pushlightuserdata(env->state, world);
 	luaL_setfuncs(env->state, reg, 1);
+
+	// register game constants
+	for (unsigned i = 0; game_constants[i].name != NULL; i++) {
+		lua_pushnumber(env->state, game_constants[i].value);
+		lua_setfield(env->state, game_table, game_constants[i].name);
+	}
+
+	// register the library as `game` global
 	lua_setglobal(env->state, "game");
 
 	return 1;

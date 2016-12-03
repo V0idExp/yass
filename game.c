@@ -367,7 +367,7 @@ world_update(struct World *world, float dt)
 		}
 		prj->x = plr->x;
 		prj->y = plr->y;
-		prj->ttl = PLAYER_PROJECTILE_TTL;
+		prj->ttl = (SCREEN_HEIGHT - 100) / PLAYER_PROJECTILE_INITIAL_SPEED;
 		prj->body.xvel = 0;
 		prj->body.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
 		prj->body.x = plr->x;

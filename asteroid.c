@@ -11,7 +11,7 @@ asteroid_new(float x, float y, float xvel, float yvel, float rot_speed)
 	ast->x = x;
 	ast->y = y;
 	ast->rot_speed = rot_speed;
-	ast->ttl = ASTEROID_TTL;
+	ast->ttl = ENTITY_TTL;
 	ast->body.xvel = xvel;
 	ast->body.yvel = yvel;
 	ast->body.x = x;

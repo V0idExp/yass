@@ -1,32 +1,95 @@
-timeline = {
-    [1] = function()
-        -- Create few asteroids
-        game.add_asteroid(32.11, 33.1, 20, 3, 3.14)
-        game.add_asteroid(-240.11, -400.1, 10, 20, -1.45)
-        game.add_asteroid(-180.11, 240.1, 10, -20, 4.45)
-        game.add_asteroid(380.11, 340.1, -20, -20, 0.85)
+require 'math'
 
-        -- Add an enemy
-        game.add_enemy(0, -350)
+-- Globals
+time = 0
+start_stage = 0
+stage = nil
+
+-- Level stages
+level = {
+    [0] = function(offset)
+        gen_random_asteroids(offset)
+        game.add_enemy(0, offset - game.SCREEN_HEIGHT / 2)
     end,
 
-    [5] = function()
-        game.add_asteroid(230, 400, -20, -30, 2.0)
-        game.add_enemy(20, -250)
+    [1] = function(offset)
+        gen_random_asteroids(offset)
+        game.add_enemy(-100, offset - 300)
+        game.add_enemy(0, offset - 250)
+        game.add_enemy(100, offset - 300)
     end,
 
-    [10] = function()
-        game.add_asteroid(-230, -400, 30, 40, -3.14)
-    end
+    [2] = function(offset)
+        gen_random_asteroids(offset)
+        game.add_enemy(-300, offset + 200)
+        game.add_enemy(-200, offset + 200)
+        game.add_enemy(300, offset + 100)
+        game.add_enemy(200, offset + 100)
+    end,
+
+    [3] = function(offset)
+        gen_random_asteroids(offset)
+        game.add_enemy(-50, offset + 50)
+        game.add_enemy(50, offset - 50)
+        game.add_enemy(-350, offset + 250)
+        game.add_enemy(-250, offset + 150)
+        game.add_enemy(350, offset - 250)
+        game.add_enemy(250, offset - 150)
+    end,
+
+    [4] = function(offset)
+        gen_random_asteroids(offset)
+    end,
+
+    [5] = function(offset)
+        gen_random_asteroids(offset)
+    end,
 }
 
-time = 0
+--
+-- Generate random world coordinate
+--
+function random_coord()
+    local half_w = game.SCREEN_WIDTH / 2
+    local half_h = game.SCREEN_HEIGHT / 2
+    return {
+        x = math.random(-half_w, half_w),
+        y = math.random(-half_h, half_h)
+    }
+end
+
+--
+-- Random asteroids generator
+--
+function gen_random_asteroids(offset)
+    local min = 6
+    local max = 12
+    for i = 1, math.random(min, max) do
+        local coord = random_coord()
+        game.add_asteroid(coord.x, offset + coord.y, 0, 0, 1.38)
+    end
+end
 
 function tick()
-    time = time + 1
+    -- compute stage index and if changed, load the next stage
+    local current_stage = start_stage + math.floor(
+        (time * game.SCROLL_SPEED) / game.SCREEN_HEIGHT)
+    if stage ~= current_stage then
+        -- load current stage on first tick
+        if stage == nil then
+            level[current_stage](0)
+        end
 
-    local event = timeline[time]
-    if event then
-        event()
+        -- pre-load next stage with an offset
+        stage = current_stage
+        local stage_factory = level[stage + 1]
+        if stage_factory then
+            stage_factory(-game.SCREEN_HEIGHT)
+        end
+
+        print("Stage", stage)
     end
+
+    -- advance time
+    time = time + 1
 end
