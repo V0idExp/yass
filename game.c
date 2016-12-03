@@ -1,7 +1,6 @@
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
-#include "types.h"
 #include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,6 +152,22 @@ world_new(void)
 	return w;
 }
 
+static void
+destroy_entity(void *entity_ptr, void *type)
+{
+	switch ((long)type) {
+	case 0:  // enemy
+		enemy_destroy(entity_ptr);
+		break;
+	case 1:  // projectile
+		projectile_destroy(entity_ptr);
+		break;
+	case 2:  // asteroid
+		asteroid_destroy(entity_ptr);
+		break;
+	}
+}
+
 void
 world_destroy(struct World *w)
 {
@@ -162,22 +177,13 @@ world_destroy(struct World *w)
 
 		// destroy entities
 		struct List *lists[] = {
-			w->asteroid_list,
-			w->projectile_list,
 			w->enemy_list,
+			w->projectile_list,
+			w->asteroid_list,
 			NULL,
 		};
-		void (*destructors[])(void*) = {
-			(DestroyFunc)asteroid_destroy,
-			destroy,
-			(DestroyFunc)enemy_destroy
-		};
-		for (unsigned i = 0; lists[i] != NULL; i++) {
-			struct ListNode *node = lists[i]->head;
-			while (node) {
-				destructors[i](node->data);
-				node = node->next;
-			}
+		for (long i = 0; lists[i] != NULL; i++) {
+			list_foreach(lists[i], destroy_entity, (void*)i);
 			list_destroy(lists[i]);
 		}
 
@@ -271,7 +277,7 @@ update_projectile(void *prj_ptr, void *ctx_ptr)
 	struct UpdateContext *ctx = ctx_ptr;
 	if ((prj->ttl -= ctx->dt) <= 0) {
 		sim_remove_body(ctx->world->sim, &prj->body);
-		free(prj);
+		projectile_destroy(prj);
 		return 0;
 	}
 
@@ -360,25 +366,10 @@ world_update(struct World *world, float dt)
 		plr->shoot_cooldown = 1.0 / PLAYER_ACTION_SHOOT_RATE;
 
 		// shoot a projectile
-		struct Projectile *prj = make(struct Projectile);
-		if (!prj) {
-			// TODO: set error
+		struct Projectile *prj = projectile_new(plr->x, plr->y);
+		if (!prj || !world_add_projectile(world, prj)) {
 			return 0;
 		}
-		prj->x = plr->x;
-		prj->y = plr->y;
-		prj->ttl = (SCREEN_HEIGHT - 100) / PLAYER_PROJECTILE_INITIAL_SPEED;
-		prj->body.xvel = 0;
-		prj->body.yvel = -PLAYER_PROJECTILE_INITIAL_SPEED;
-		prj->body.x = plr->x;
-		prj->body.y = plr->y;
-		prj->body.radius = 4;
-		prj->body.type = BODY_TYPE_PROJECTILE;
-		prj->body.collision_mask = BODY_TYPE_ENEMY;
-		prj->body.userdata = prj;
-
-		// TODO: handle the error
-		world_add_projectile(world, prj);
 	}
 
 	struct UpdateContext ctx = {

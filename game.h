@@ -199,3 +199,19 @@ asteroid_new(float x, float y, float xvel, float yvel, float rot_speed);
  */
 void
 asteroid_destroy(struct Asteroid *ast);
+
+/**
+ * Create a projectile.
+ *
+ * NOTE: Do not attempt to destroy an object owned by the world.
+ */
+struct Projectile*
+projectile_new(float x, float y);
+
+/**
+ * Destroy a projectile.
+ *
+ * NOTE: Do not attempt to destroy an object owned by the world.
+ */
+void
+projectile_destroy(struct Projectile *prj);
