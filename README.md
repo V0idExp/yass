@@ -11,8 +11,6 @@ The list of dependencies is (hopefully) short and easy to satisfiy:
  * SDL2
  * SDL2_image
  * GLEW
- * Lua 5.3 (included in source distribution)
-
 
 # Build
 
