@@ -8,6 +8,7 @@
 #define SIMULATION_STEP 1.0 / 30
 #define TICK 1.0 // seconds
 #define EVENT_QUEUE_BASE_SIZE 20
+#define SCROLL_SPEED 30.0 // units / second
 
 #define ENEMY_INITIAL_HITPOINTS 30.0
 #define ENEMY_TTL 5.0 // seconds
@@ -55,12 +56,12 @@ enum {
  * Player.
  */
 struct Player {
-	float hitpoints;
-	float x, y;     // position
-	int actions;    // actions bitmask
-	float speed;    // speed in units/second
-	float shoot_cooldown;
+	float x, y;
 	struct Body body;
+	float hitpoints;
+	int actions;
+	float speed;
+	float shoot_cooldown;
 };
 
 /**
@@ -68,9 +69,9 @@ struct Player {
  */
 struct Enemy {
 	float x, y;
+	struct Body body;
 	float hitpoints;
 	float ttl;
-	struct Body body;
 };
 
 /**
@@ -78,10 +79,10 @@ struct Enemy {
  */
 struct Asteroid {
 	float x, y;
+	struct Body body;
 	float rot;
 	float rot_speed;
 	float ttl;
-	struct Body body;
 };
 
 /**
@@ -89,8 +90,8 @@ struct Asteroid {
  */
 struct Projectile {
 	float x, y;
-	float ttl;
 	struct Body body;
+	float ttl;
 };
 
 /**

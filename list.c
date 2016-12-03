@@ -87,3 +87,14 @@ list_filter(struct List *list, FilterFunc filter, void *userdata)
 		}
 	}
 }
+
+void
+list_foreach(struct List *list, OpFunc op, void *userdata)
+{
+	assert(list != NULL);
+	struct ListNode *node = list->head;
+	while (node) {
+		op(node->data, userdata);
+		node = node->next;
+	}
+}

@@ -11,6 +11,11 @@ struct UpdateContext {
 	float dt;
 };
 
+struct Entity {
+	float x, y;
+	struct Body body;
+};
+
 static void
 add_event(struct World *world, const struct Event *evt)
 {
@@ -277,6 +282,14 @@ update_projectile(void *prj_ptr, void *ctx_ptr)
 	return 1;
 }
 
+static void
+scroll_entity(void *entity_ptr, void *ctx_ptr)
+{
+	struct Entity *entity = entity_ptr;
+	struct UpdateContext *ctx = ctx_ptr;
+	entity->y = entity->body.y += SCROLL_SPEED * ctx->dt;
+}
+
 int
 world_update(struct World *world, float dt)
 {
@@ -334,13 +347,10 @@ world_update(struct World *world, float dt)
 	// update player position
 	float distance = dt * plr->speed;
 	if (plr->actions & ACTION_MOVE_LEFT) {
-		plr->x -= distance;
+		plr->x = plr->body.x -= distance;
 	} else if (plr->actions & ACTION_MOVE_RIGHT) {
-		plr->x += distance;
+		plr->x = plr->body.x += distance;
 	}
-
-	// update player body position
-	plr->body.x = plr->x;
 
 	// handle shooting
 	plr->shoot_cooldown -= dt;
@@ -384,6 +394,10 @@ world_update(struct World *world, float dt)
 
 	// update projectiles
 	list_filter(world->projectile_list, update_projectile, &ctx);
+
+	// scroll entities down
+	list_foreach(world->enemy_list, scroll_entity, &ctx);
+	list_foreach(world->asteroid_list, scroll_entity, &ctx);
 
 	return 1;
 }
