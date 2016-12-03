@@ -35,8 +35,9 @@ string_join(const char **strings, const char *sep)
 	size_t strings_count;
 	for (strings_count = 0; strings[strings_count]; strings_count++);
 
-	if (strings_count == 0)
+	if (strings_count == 0) {
 		return NULL;
+	}
 
 	// compute lengths
 	size_t lengths[strings_count];
@@ -53,15 +54,17 @@ string_join(const char **strings, const char *sep)
 
 	// allocate the buffer for the resulting string
 	char *result = malloc(len + 1);
-	if (!result)
+	if (!result) {
 		return NULL;
+	}
 	result[len] = 0; // NUL-terminator
 
 	// concatenate strings
 	char *dst = result;
 	for (size_t i = 0; i < strings_count; i++) {
-		if (!strings[i])
+		if (!strings[i]) {
 			continue;
+		}
 		strncpy(dst, strings[i], lengths[i]);
 		dst += lengths[i];
 		if (i < strings_count - 1) {
@@ -95,8 +98,9 @@ string_replace(const char *src, const char *pat, const char *repl)
 	// allocate a buffer large enough to contain new text
 	size_t len = src_len - pat_len * count + repl_len * count;
 	char *result = malloc(len + 1);
-	if (!result)
+	if (!result) {
 		return NULL;
+	}
 	result[len] = 0; // NUL-terminator
 
 	// copy each non-overlapping string preceeding the pattern and append

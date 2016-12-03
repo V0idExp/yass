@@ -40,8 +40,9 @@ file_read(const char *filename, char **r_buf)
 	}
 
 cleanup:
-	if (fp)
+	if (fp) {
 		fclose(fp);
+	}
 	return size;
 
 error:
