@@ -1,16 +1,19 @@
 #include "error.h"
+#include "font.h"
+#include "matlib.h"
+#include "memory.h"
 #include "renderer.h"
 #include "shader.h"
 #include "sprite.h"
 #include "text.h"
-#include "matlib.h"
-#include "memory.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #define RENDER_LIST_MAX_LEN 1000
 #define SPRITE_TEXTURE_UNIT 0
+#define TEXT_GLYPH_TEXTURE_UNIT 1
+#define TEXT_ATLAS_TEXTURE_UNIT 2
 
 enum {
 	RENDER_NODE_SPRITE,
@@ -28,12 +31,18 @@ static struct Renderer {
 		struct ShaderUniform u_size;
 		struct ShaderUniform u_transform;
 	} sprite_pipeline;
+	struct {
+		struct Shader *shader;
+		struct ShaderUniform u_transform;
+		struct ShaderUniform u_glyph_texture;
+		struct ShaderUniform u_atlas_texture;
+		struct ShaderUniform u_atlas_offset;
+	} text_pipeline;
 } rndr = { 0, NULL, NULL };
 
 struct RenderNode {
 	int type;
 	Mat transform;
-	GLuint vao;
 	union {
 		struct Sprite *sprite;
 		struct Text *text;
@@ -69,8 +78,43 @@ init_sprite_pipeline(void)
 		NULL,
 		NULL
 	);
-	if (!rndr.sprite_pipeline.shader ||
-	    !shader_bind(rndr.sprite_pipeline.shader)) {
+	if (!rndr.sprite_pipeline.shader) {
+		fprintf(
+			stderr,
+			"failed to initialize rendering pipeline\n"
+		);
+		return 0;
+	}
+	return 1;
+}
+
+static int
+init_text_pipeline(void)
+{
+	// load and compile the shader
+	const char *uniform_names[] = {
+		"glyph_tex",
+		"atlas_tex",
+		"atlas_offset",
+		"transform",
+		NULL
+	};
+	struct ShaderUniform *uniforms[] = {
+		&rndr.text_pipeline.u_glyph_texture,
+		&rndr.text_pipeline.u_atlas_texture,
+		&rndr.text_pipeline.u_atlas_offset,
+		&rndr.text_pipeline.u_transform,
+		NULL
+	};
+	rndr.text_pipeline.shader = shader_compile(
+		"data/shaders/text.vert",
+		"data/shaders/text.frag",
+		uniform_names,
+		uniforms,
+		NULL,
+		NULL
+	);
+	if (!rndr.text_pipeline.shader) {
 		fprintf(
 			stderr,
 			"failed to initialize rendering pipeline\n"
@@ -154,7 +198,8 @@ renderer_init(unsigned width, unsigned height)
 	);
 
 	rndr.initialized = (
-		init_sprite_pipeline()
+		init_sprite_pipeline() &&
+		init_text_pipeline()
 	);
 
 	if (!rndr.initialized) {
@@ -275,17 +320,113 @@ render_sprite_node(const struct RenderNode *node)
 	return ok;
 }
 
+void
+render_list_add_text(
+	struct RenderList *list,
+	const struct Text *txt,
+	float x,
+	float y
+) {
+	// initialize text render node
+	struct RenderNode *node = &list->nodes[list->len++];
+	node->type = RENDER_NODE_TEXT;
+	node->text = (struct Text*)txt;
+	mat_ident(&node->transform);
+	mat_translate(&node->transform, x, -y, 0);
+}
+
+static int
+render_text_node(const struct RenderNode *node)
+{
+	int ok = 1;
+
+	// configure transform
+	Mat mvp;
+	mat_mul(&rndr.projection, &node->transform, &mvp);
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_transform,
+		1,
+		&mvp
+	);
+
+	// configure atlas offset
+	unsigned int offset = font_get_atlas_offset(node->text->font);
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_atlas_offset,
+		1,
+		&offset
+	);
+
+	// configure texture samplers
+	GLuint glyph_texture_unit = TEXT_GLYPH_TEXTURE_UNIT;
+	GLuint atlas_texture_unit = TEXT_ATLAS_TEXTURE_UNIT;
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_glyph_texture,
+		1,
+		&glyph_texture_unit
+	);
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_atlas_texture,
+		1,
+		&atlas_texture_unit
+	);
+
+	// render
+	glActiveTexture(GL_TEXTURE0 + atlas_texture_unit);
+	glBindTexture(
+		GL_TEXTURE_RECTANGLE,
+		font_get_atlas_texture(node->text->font)
+	);
+	glActiveTexture(GL_TEXTURE0 + glyph_texture_unit);
+	glBindTexture(
+		GL_TEXTURE_1D,
+		font_get_glyph_texture(node->text->font)
+	);
+	glBindVertexArray(node->text->vao);
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, node->text->len);
+
+	ok &= glGetError() == GL_NO_ERROR;
+
+	return ok;
+}
+
+static int
+node_cmp(const void *a, const void *b)
+{
+	if (((struct RenderNode*)a)->type == ((struct RenderNode*)b)->type) {
+		return 0;
+	} else if (a < b) {
+		return -1;
+	}
+	return 1;
+}
+
 int
 render_list_exec(struct RenderList *list)
 {
 	int ok = 1;
+
+	// sort the list by node type
+	qsort(list->nodes, list->len, sizeof(struct RenderNode), node_cmp);
+
+	int active = -1;
 	for (size_t i = 0; i < list->len; i++) {
 		struct RenderNode *node = &list->nodes[i];
 		switch (node->type) {
 		case RENDER_NODE_SPRITE:
+			if (active != node->type) {
+				ok &= shader_bind(rndr.sprite_pipeline.shader);
+			}
 			ok &= render_sprite_node(node);
 			break;
+		case RENDER_NODE_TEXT:
+			if (active != node->type) {
+				ok &= shader_bind(rndr.text_pipeline.shader);
+			}
+			ok &= render_text_node(node);
+			break;
 		}
+		active = node->type;
 
 		if (!ok) {
 			break;

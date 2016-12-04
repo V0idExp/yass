@@ -7,18 +7,24 @@
 #include "script.h"
 #include "shader.h"
 #include "sprite.h"
+#include "strutils.h"
+#include "text.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+/*** GLOBALS ***/
+static unsigned fps = 0;
+
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
-static struct Font *font = NULL;
+static struct Font *font_ui = NULL;
+static struct Text *fps_text = NULL;
 
 static int
 load_resources(void)
@@ -45,9 +51,9 @@ load_resources(void)
 		printf("loaded sprite `%s`\n", sprite_files[i]);
 	}
 
-	// load font
-	font = font_from_file("data/fonts/kenvector_future_thin.ttf", 14);
-	if (!font) {
+	// load fonts
+	font_ui = font_from_file("data/fonts/kenvector_future_thin.ttf", 16);
+	if (!font_ui) {
 		return 0;
 	}
 
@@ -57,14 +63,15 @@ load_resources(void)
 static void
 cleanup_resources(void)
 {
-	font_destroy(font);
+	text_destroy(fps_text);
+	font_destroy(font_ui);
 	sprite_destroy(spr_player);
 	sprite_destroy(spr_asteroid_01);
 	sprite_destroy(spr_projectile_01);
 }
 
-static int
-render_world(struct World *world, struct RenderList *rndr_list)
+static void
+render_world(struct RenderList *rndr_list, struct World *world)
 {
 	render_list_add_sprite(
 		rndr_list,
@@ -114,8 +121,21 @@ render_world(struct World *world, struct RenderList *rndr_list)
 		);
 		enemy_node = enemy_node->next;
 	}
+}
 
-	return 1;
+static void
+render_ui(struct RenderList *rndr_list)
+{
+	// render FPS indicator
+	char *fps_text_str = string_fmt("FPS: %d", fps);
+	text_set_string(fps_text, fps_text_str);
+	free(fps_text_str);
+	render_list_add_text(
+		rndr_list,
+		fps_text,
+		-SCREEN_WIDTH / 2,
+		-SCREEN_HEIGHT / 2
+	);
 }
 
 static int
@@ -183,9 +203,17 @@ main(int argc, char *argv[])
 		goto cleanup;
 	}
 
+	// create FPS text
+	fps_text = text_new(font_ui);
+	if (!fps_text) {
+		ok = 0;
+		goto cleanup;
+	}
+
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
-	float tick = 0;
+	float tick = 0, time_acc = 0;
+	unsigned frame_count = 0;
 	while (ok && run) {
 		// handle input
 		SDL_Event evt;
@@ -208,6 +236,16 @@ main(int argc, char *argv[])
 		last_update = now;
 		tick += dt;
 
+		// update FPS counter
+		time_acc += dt;
+		if (time_acc >= 1.0) {
+			time_acc -= 1.0;
+			fps = frame_count;
+			frame_count = 0;
+		} else {
+			frame_count++;
+		}
+
 		// notify script environment
 		while (tick >= TICK) {
 			tick -= TICK;
@@ -219,7 +257,8 @@ main(int argc, char *argv[])
 
 		// render!
 		renderer_clear();
-		render_world(world, rndr_list);
+		render_world(rndr_list, world);
+		render_ui(rndr_list);
 		render_list_exec(rndr_list);
 		renderer_present();
 	}

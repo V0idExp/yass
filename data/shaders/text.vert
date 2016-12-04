@@ -3,7 +3,7 @@
 layout(location=0) in vec2 in_coord;
 layout(location=1) in uint in_char;
 
-uniform mat4 mvp;
+uniform mat4 transform;
 uniform usampler1D glyph_tex;
 
 out vec2 uv;
@@ -24,5 +24,5 @@ void main()
 	uv.t = y;
 
 	// compute position
-	gl_Position = mvp * vec4(in_coord.x + x, in_coord.y + y, 0, 1);
+	gl_Position = transform * vec4(in_coord.x + x, in_coord.y + y, 0, 1);
 }
