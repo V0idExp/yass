@@ -1,3 +1,4 @@
+#include "error.h"
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
@@ -15,7 +16,7 @@ struct Entity {
 	struct Body body;
 };
 
-static void
+static int
 add_event(struct World *world, const struct Event *evt)
 {
 	// extend the event queue
@@ -26,8 +27,8 @@ add_event(struct World *world, const struct Event *evt)
 			sizeof(struct Event) * new_size
 		);
 		if (!new_queue) {
-			fprintf(stderr, "event queue too long: out of memory\n");
-			exit(EXIT_FAILURE);
+			error(ERR_NO_MEM);
+			return 0;
 		}
 		world->event_queue = new_queue;
 		world->event_queue_size = new_size;
@@ -35,6 +36,8 @@ add_event(struct World *world, const struct Event *evt)
 
 	// append the event to the end of the queue
 	world->event_queue[world->event_count++] = *evt;
+
+	return 1;
 }
 
 static int
@@ -49,7 +52,7 @@ handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 			}
 		};
 		struct World *world = userdata;
-		add_event(world, &evt);
+		return add_event(world, &evt);
 	}
 	return 1;
 }
@@ -67,7 +70,7 @@ handle_enemy_hit(struct Body *a, struct Body *b, void *userdata)
 
 		};
 		struct World *world = userdata;
-		add_event(world, &evt);
+		return add_event(world, &evt);
 	}
 	return 1;
 }
@@ -87,15 +90,14 @@ world_new(void)
 	if (!w->asteroid_list ||
 	    !w->projectile_list ||
 	    !w->enemy_list) {
-		world_destroy(NULL);
-		return NULL;
+		error(ERR_NO_MEM);
+		goto error;
 	}
 
 	// initialize simulation system and register collision callbacks
 	w->sim = sim_new();
 	if (!w->sim) {
-		world_destroy(w);
-		return NULL;
+		goto error;
 	}
 	struct CollisionHandler handlers[] = {
 		{
@@ -117,16 +119,14 @@ world_new(void)
 	};
 	for (int i = 0; handlers[i].callback; i++) {
 		if (!sim_add_handler(w->sim, &handlers[i])) {
-			world_destroy(w);
-			return NULL;
+			goto error;
 		}
 	}
 
 	// initialize event queue
 	w->event_queue = malloc(sizeof(struct Event) * EVENT_QUEUE_BASE_SIZE);
 	if (!w->event_queue) {
-		world_destroy(w);
-		return NULL;
+		goto error;
 	}
 	w->event_queue_size = EVENT_QUEUE_BASE_SIZE;
 
@@ -145,11 +145,14 @@ world_new(void)
 	w->player.body = player_body;
 
 	if (!sim_add_body(w->sim, &w->player.body)) {
-		world_destroy(w);
-		return NULL;
+		goto error;
 	}
 
 	return w;
+
+error:
+	world_destroy(w);
+	return NULL;
 }
 
 static void
@@ -195,6 +198,7 @@ int
 world_add_asteroid(struct World *world, struct Asteroid *ast)
 {
 	if (!list_add(world->asteroid_list, ast)) {
+		error(ERR_NO_MEM);
 		return 0;
 	} else if (!sim_add_body(world->sim, &ast->body)) {
 		list_remove(world->asteroid_list, ast, ptr_cmp);
@@ -207,6 +211,7 @@ int
 world_add_enemy(struct World *world, struct Enemy *enemy)
 {
 	if (!list_add(world->enemy_list, enemy)) {
+		error(ERR_NO_MEM);
 		return 0;
 	} else if (!sim_add_body(world->sim, &enemy->body)) {
 		list_remove(world->enemy_list, enemy, ptr_cmp);
@@ -219,6 +224,7 @@ int
 world_add_projectile(struct World *world, struct Projectile *projectile)
 {
 	if (!list_add(world->projectile_list, projectile)) {
+		error(ERR_NO_MEM);
 		return 0;
 	} else if (!sim_add_body(world->sim, &projectile->body)) {
 		list_remove(world->projectile_list, projectile, ptr_cmp);
@@ -241,6 +247,7 @@ update_enemy(void *enemy_ptr, void *ctx_ptr)
 		enemy_destroy(enemy);
 		return 0;
 	}
+
 	return 1;
 }
 
@@ -305,7 +312,9 @@ world_update(struct World *world, float dt)
 	static float sim_acc = 0;
 	sim_acc += dt;
 	while (sim_acc >= SIMULATION_STEP) {
-		sim_step(world->sim, SIMULATION_STEP);
+		if (!sim_step(world->sim, SIMULATION_STEP)) {
+			return 0;
+		}
 		sim_acc -= SIMULATION_STEP;
 	}
 
@@ -370,6 +379,7 @@ world_update(struct World *world, float dt)
 		// shoot a projectile
 		struct Projectile *prj = projectile_new(plr->x, plr->y);
 		if (!prj || !world_add_projectile(world, prj)) {
+			projectile_destroy(prj);
 			return 0;
 		}
 	}

@@ -36,7 +36,7 @@ check_collision(struct Body *a, struct Body *b)
 	return dist < a->radius + b->radius;
 }
 
-static void
+static int
 dispatch_collision(struct SimulationSystem *sys, struct Body *a, struct Body *b)
 {
 	for (size_t i = 0; i < sys->handler_count; i++) {
@@ -44,12 +44,13 @@ dispatch_collision(struct SimulationSystem *sys, struct Body *a, struct Body *b)
 		if (h.callback != NULL &&
 		    h.type_mask & a->type &&
 		    h.type_mask & b->type) {
-			h.callback(a, b, h.userdata);
+			return h.callback(a, b, h.userdata);
 		}
 	}
+	return 1;
 }
 
-void
+int
 sim_step(struct SimulationSystem *sys, float dt)
 {
 	struct ListNode *node_a = sys->body_list->head;
@@ -67,12 +68,15 @@ sim_step(struct SimulationSystem *sys, float dt)
 			    a->type & b->collision_mask &&
 			    b->type & a->collision_mask &&
 			    check_collision(a, b)) {
-				dispatch_collision(sys, a, b);
+				if (!dispatch_collision(sys, a, b)) {
+					return 0;
+				}
 			}
 			node_b = node_b->next;
 		}
 		node_a = node_a->next;
 	}
+	return 1;
 }
 
 int

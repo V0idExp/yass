@@ -2,6 +2,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
+#include "error.h"
 #include "memory.h"
 #include "script.h"
 #include <assert.h>
@@ -164,6 +165,7 @@ script_env_new(void)
 	env->state = luaL_newstate();
 	if (!env->state) {
 		script_env_destroy(env);
+		error(ERR_SCRIPT_INIT);
 		return NULL;
 	}
 
@@ -215,8 +217,10 @@ script_env_load_file(struct ScriptEnv *env, const char *filename)
 			filename,
 			lua_tostring(env->state, -1)
 		);
+		error(ERR_SCRIPT_LOAD);
 		return 0;
 	}
+
 #ifdef DEBUG
 	printf("loaded script `%s`\n", filename);
 #endif
@@ -240,9 +244,10 @@ script_env_tick(struct ScriptEnv *env)
 		if (lua_pcall(env->state, 0, 0, 0) != LUA_OK) {
 			fprintf(
 				stderr,
-				"failed to call `update()` script function:\n%s\n",
+				"failed to call `tick()` script function:\n%s\n",
 				lua_tostring(env->state, -1)
 			);
+			error(ERR_SCRIPT_CALL);
 			return 0;
 		}
 	}

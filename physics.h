@@ -34,7 +34,7 @@ sim_new(void);
 void
 sim_destroy(struct SimulationSystem *sys);
 
-void
+int
 sim_step(struct SimulationSystem *sys, float dt);
 
 int

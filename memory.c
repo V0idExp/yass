@@ -1,3 +1,4 @@
+#include "error.h"
 #include "memory.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@ alloc0(size_t size)
 {
 	void *bytes = malloc(size);
 	if (!size) {
+		error(ERR_NO_MEM);
 		return NULL;
 	}
 	memset(bytes, 0, size);
@@ -20,6 +22,7 @@ copy(const void *ptr, size_t size)
 	assert(ptr != NULL);
 	void *clone = malloc(size);
 	if (!clone) {
+		error(ERR_NO_MEM);
 		return NULL;
 	}
 	memcpy(clone, ptr, size);

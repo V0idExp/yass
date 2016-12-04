@@ -1,9 +1,10 @@
+#include "error.h"
+#include "memory.h"
+#include "sprite.h"
 #include <SDL.h>
 #include <SDL_image.h>
 #include <assert.h>
 #include <stdio.h>
-#include "sprite.h"
-#include "memory.h"
 
 static GLuint
 texture_from_file(const char *filename, int *width, int *height)
@@ -21,6 +22,7 @@ texture_from_file(const char *filename, int *width, int *height)
 			"failed to initialize SDL image library: %s\n",
 			IMG_GetError()
 		);
+		error(ERR_SDL);
 		return 0;
 	}
 	img_initialized = 1;
@@ -33,6 +35,7 @@ texture_from_file(const char *filename, int *width, int *height)
 			"failed to load image `%s`: %s\n", filename,
 			IMG_GetError()
 		);
+		error(ERR_FILE_READ);
 		return 0;
 	}
 
@@ -58,6 +61,7 @@ texture_from_file(const char *filename, int *width, int *height)
 			"image conversion to RGBA32 format failed: %s\n",
 			SDL_GetError()
 		);
+		error(ERR_SDL);
 		goto error;
 	}
 
@@ -69,6 +73,7 @@ texture_from_file(const char *filename, int *width, int *height)
 			"OpenGL texture creation failed (error %d)\n",
 			glGetError()
 		);
+		error(ERR_OPENGL);
 		goto error;
 	}
 
@@ -103,6 +108,7 @@ texture_from_file(const char *filename, int *width, int *height)
 			"OpenGL texture initialization failed (error %d)\n",
 			glGetError()
 		);
+		error(ERR_OPENGL);
 		goto error;
 	}
 
@@ -140,6 +146,7 @@ sprite_from_file(const char *filename)
 			"failed to generate OpenGL sprite VAO (error %d)\n",
 			glGetError()
 		);
+		error(ERR_OPENGL);
 		goto error;
 	}
 

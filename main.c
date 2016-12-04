@@ -1,3 +1,4 @@
+#include "error.h"
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
@@ -485,6 +486,13 @@ cleanup:
 	world_destroy(world);
 	cleanup_resources();
 	renderer_shutdown(&rndr);
+
+ 	ok &= !error_is_set();
+	if (!ok) {
+		error_dump(stdout);
+	}
+
+
 	printf(ok ? "Bye!\n" : "Oops!\n");
 	return !(ok == 1);
 }
