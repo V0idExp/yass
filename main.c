@@ -59,10 +59,10 @@ static int
 load_resources(void)
 {
 	const char *sprite_files[] = {
-		"data/playerShip1_blue.png",
-		"data/enemyBlack2.png",
-		"data/meteorGrey_small2.png",
-		"data/laserBlue07.png",
+		"data/art/playerShip1_blue.png",
+		"data/art/Enemies/enemyBlack2.png",
+		"data/art/Meteors/meteorGrey_small2.png",
+		"data/art/Lasers/laserBlue07.png",
 		NULL
 	};
 	struct Sprite **sprites[] = {
@@ -214,8 +214,8 @@ renderer_init(struct Renderer *rndr, unsigned width, unsigned height) {
 		NULL
 	};
 	rndr->pipeline.shader = shader_compile(
-		"data/rect.vert",
-		"data/rect.frag",
+		"data/shaders/sprite.vert",
+		"data/shaders/sprite.frag",
 		uniform_names,
 		uniforms,
 		NULL,
