@@ -1,4 +1,5 @@
 #include "error.h"
+#include "font.h"
 #include "game.h"
 #include "matlib.h"
 #include "memory.h"
@@ -54,10 +55,12 @@ static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
+static struct Font *font = NULL;
 
 static int
 load_resources(void)
 {
+	// load sprites
 	const char *sprite_files[] = {
 		"data/art/playerShip1_blue.png",
 		"data/art/Enemies/enemyBlack2.png",
@@ -79,12 +82,19 @@ load_resources(void)
 		printf("loaded sprite `%s`\n", sprite_files[i]);
 	}
 
+	// load font
+	font = font_from_file("data/fonts/kenvector_future_thin.ttf", 14);
+	if (!font) {
+		return 0;
+	}
+
 	return 1;
 }
 
 static void
 cleanup_resources(void)
 {
+	font_destroy(font);
 	sprite_destroy(spr_player);
 	sprite_destroy(spr_asteroid_01);
 	sprite_destroy(spr_projectile_01);
