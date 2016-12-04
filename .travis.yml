@@ -4,4 +4,4 @@ sudo: required
 script: make
 before_install:
  - sudo apt-get -qq update
- - sudo apt-get install -y libblas-dev libsdl2-dev libglew-dev libsdl2-image-dev
+ - sudo apt-get install -y libblas-dev libsdl2-dev libglew-dev libsdl2-image-dev libfreetype6-dev
