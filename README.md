@@ -8,9 +8,9 @@ a sandbox project in which (square) wheels can be reinvented, (bad) design
 decisions tried out and (poor) implementation done for learning. It is not meant
 in any way to be fun, engaging, original or something else which a good game
 should be. A bit of effort is made though to keep the codebase clean, apply a
-consistent coding style and having an overall robust and performant
-implementation. Code is splitted in modules tied as less as possible, in order
-to make them easily copy-pastable to other projects.
+consistent coding style and have an overall robust and performant
+implementation. Code is split in modules tied as less as possible, in order to
+make it easily copy-pastable to other projects.
 
 *Build and play on your own risk! :)*
 
@@ -30,6 +30,8 @@ The list of dependencies is (hopefully) short and easy to satisfy:
  * SDL2
  * SDL2_image
  * GLEW
+ * Basic Linear Algebra Subroutines (BLAS) compatible library
+   (`libblas-dev` on Ubuntu, `Accelerate` framework on OSX)
 
 # Build
 
