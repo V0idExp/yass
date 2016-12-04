@@ -136,12 +136,6 @@ renderer_shutdown(struct Renderer *rndr);
 static int
 handle_key(const SDL_Event *key_evt, struct World *world);
 
-/**
- * Add a render node to render queue.
- */
-void
-pipeline_add_node(struct Pipeline *pipelne, const struct RenderNode *node);
-
 static int
 renderer_init(struct Renderer *rndr, unsigned width, unsigned height) {
 	// initialize SDL video subsystem
