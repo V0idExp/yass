@@ -279,7 +279,7 @@ error:
 }
 
 const struct Character*
-font_lookup_char(struct Font *font, char c)
+font_get_char(struct Font *font, char c)
 {
 	assert(font != NULL);
 	return &font->charmap[(int)c];
