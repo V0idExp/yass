@@ -30,6 +30,7 @@ The list of dependencies is (hopefully) short and easy to satisfy:
  * SDL2
  * SDL2_image
  * GLEW
+ * FreeType2
  * Basic Linear Algebra Subroutines (BLAS) compatible library
    (`libblas-dev` on Ubuntu, `Accelerate` framework on OSX)
 

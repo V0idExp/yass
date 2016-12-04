@@ -1,9 +1,9 @@
-CFLAGS := $(CFLAGS) -std=c99 -Wall -Werror -g -DDEBUG -I./lua/install/include `sdl2-config --cflags` `pkg-config --cflags glew SDL2_image`
-LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config --libs glew SDL2_image`
+CFLAGS := $(CFLAGS) -std=c99 -Wall -Werror -g -DDEBUG -I./lua/install/include `sdl2-config --cflags` `pkg-config --cflags freetype2 glew SDL2_image`
+LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config --libs freetype2 glew SDL2_image`
 OS := $(shell uname -s)
 LUA_LIB = lua/install/lib/liblua.a
 LUA_TARGET :=
-OBJS = error.o projectile.o asteroid.o utils.o enemy.o list.o main.o sprite.o memory.o matlib.o shader.o ioutils.o strutils.o script.o physics.o game.o
+OBJS = renderer.o text.o font.o error.o projectile.o asteroid.o utils.o enemy.o list.o main.o sprite.o memory.o matlib.o shader.o ioutils.o strutils.o script.o physics.o game.o
 
 ifeq ($(OS), Linux)
 	LUA_TARGET += linux
