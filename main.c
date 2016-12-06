@@ -15,16 +15,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/*** GLOBALS ***/
-static unsigned fps = 0;
-
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
-static struct Font *font_ui = NULL;
+static struct Font *font_dbg = NULL;
 static struct Text *fps_text = NULL;
+static struct Text *render_time_text = NULL;
 
 static int
 load_resources(void)
@@ -45,15 +43,35 @@ load_resources(void)
 	};
 	for (int i = 0; sprite_files[i] != NULL; i++) {
 		if (!(*sprites[i] = sprite_from_file(sprite_files[i]))) {
-			fprintf(stderr, "failed to load `%s`\n", sprite_files[i]);
+			fprintf(stderr, "failed to load sprite `%s`\n", sprite_files[i]);
 			return 0;
 		}
 		printf("loaded sprite `%s`\n", sprite_files[i]);
 	}
 
 	// load fonts
-	font_ui = font_from_file("data/fonts/kenvector_future_thin.ttf", 16);
-	if (!font_ui) {
+	const char *font_files[] = {
+		"data/fonts/courier.ttf",
+		NULL
+	};
+	int font_sizes[] = {
+		16,
+	};
+	struct Font **fonts[] = {
+		&font_dbg,
+	};
+	for (int i = 0; font_files[i] != NULL; i++) {
+		if (!(*fonts[i] = font_from_file(font_files[i], font_sizes[i]))) {
+			fprintf(stderr, "failed to load font `%s`\n", font_files[i]);
+			return 0;
+		}
+		printf("loaded font `%s`\n", font_files[i]);
+	}
+
+	// create text renderables
+	fps_text = text_new(font_dbg);
+	render_time_text = text_new(font_dbg);
+	if (!fps_text || !render_time_text) {
 		return 0;
 	}
 
@@ -63,8 +81,9 @@ load_resources(void)
 static void
 cleanup_resources(void)
 {
+	text_destroy(render_time_text);
 	text_destroy(fps_text);
-	font_destroy(font_ui);
+	font_destroy(font_dbg);
 	sprite_destroy(spr_player);
 	sprite_destroy(spr_asteroid_01);
 	sprite_destroy(spr_projectile_01);
@@ -127,14 +146,19 @@ static void
 render_ui(struct RenderList *rndr_list)
 {
 	// render FPS indicator
-	char *fps_text_str = string_fmt("FPS: %d", fps);
-	text_set_string(fps_text, fps_text_str);
-	free(fps_text_str);
 	render_list_add_text(
 		rndr_list,
 		fps_text,
 		-SCREEN_WIDTH / 2,
 		-SCREEN_HEIGHT / 2
+	);
+
+	// render render time indicator
+	render_list_add_text(
+		rndr_list,
+		render_time_text,
+		-SCREEN_WIDTH / 2,
+		-SCREEN_HEIGHT / 2 + 20
 	);
 }
 
@@ -203,18 +227,19 @@ main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	// create FPS text
-	fps_text = text_new(font_ui);
-	if (!fps_text) {
-		ok = 0;
-		goto cleanup;
-	}
-
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
 	float tick = 0, time_acc = 0;
 	unsigned frame_count = 0;
 	while (ok && run) {
+		// compute timers and counters
+		Uint32 now = SDL_GetTicks();
+		float dt = (now - last_update) / 1000.0f;
+		last_update = now;
+		tick += dt;
+		time_acc += dt;
+		frame_count++;
+
 		// handle input
 		SDL_Event evt;
 		while (SDL_PollEvent(&evt)) {
@@ -230,21 +255,8 @@ main(int argc, char *argv[])
 			}
 		}
 
-		// compute delta time and update the world
-		Uint32 now = SDL_GetTicks();
-		float dt = (now - last_update) / 1000.0f;
-		last_update = now;
-		tick += dt;
-
-		// update FPS counter
-		time_acc += dt;
-		if (time_acc >= 1.0) {
-			time_acc -= 1.0;
-			fps = frame_count;
-			frame_count = 0;
-		} else {
-			frame_count++;
-		}
+		// update the world
+		run &= world_update(world, dt);
 
 		// notify script environment
 		while (tick >= TICK) {
@@ -252,15 +264,30 @@ main(int argc, char *argv[])
 			ok &= script_env_tick(env);
 		}
 
-		// update the world
-		run &= world_update(world, dt);
-
 		// render!
+		now = SDL_GetTicks();
 		renderer_clear();
 		render_world(rndr_list, world);
 		render_ui(rndr_list);
 		render_list_exec(rndr_list);
 		renderer_present();
+		Uint32 render_time = SDL_GetTicks() - now;
+
+		// each second, update the stats
+		if (time_acc >= 1.0) {
+			time_acc -= 1.0;
+
+			// update fps
+			char *str = string_fmt("FPS: %d", frame_count);
+			text_set_string(fps_text, str);
+			free(str);
+			frame_count = 0;
+
+			// update render time
+			str = string_fmt("Render time: %dms", render_time);
+			text_set_string(render_time_text, str);
+			free(str);
+		}
 	}
 
 cleanup:
