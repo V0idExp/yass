@@ -5,7 +5,6 @@
 #include "font.h"
 #include <assert.h>
 #include <stdlib.h>
-#include <stdio.h>
 
 static int ft_initialized = 0;
 static FT_Library ft;
@@ -20,26 +19,16 @@ struct Font {
 static void
 shutdown_freetype(void)
 {
-	if (ft_initialized) {
-		FT_Done_FreeType(ft);
-		ft_initialized = 0;
-	}
+	FT_Done_FreeType(ft);
+	ft_initialized = 0;
 }
 
 static int
 init_freetype(void)
 {
 	if (FT_Init_FreeType(&ft) != 0) {
-		fprintf(stderr, "failed to initialize FreeType library\n");
 		return 0;
 	}
-
-#ifdef DEBUG
-	int major, minor, patch;
-	FT_Library_Version(ft, &major, &minor, &patch);
-	printf("Initialized FreeType %d.%d.%d\n", major, minor, patch);
-#endif
-
 	atexit(shutdown_freetype);
 	ft_initialized = 1;
 	return 1;
@@ -48,17 +37,16 @@ init_freetype(void)
 static int
 init_glyph_texture(struct Font *font, FT_Glyph *glyphs)
 {
+	glGenTextures(1, &font->tex_glyph);
+	if (!font->tex_glyph) {
+		return 0;
+	}
+
 	GLubyte data[128][2];
 	for (unsigned char c = 0; c < 128; c++) {
 		struct Character *ch = &font->charmap[c];
 		data[c][0] = ch->size[0];
 		data[c][1] = ch->size[1];
-	}
-
-	glGenTextures(1, &font->tex_glyph);
-	if (!font->tex_glyph) {
-		fprintf(stderr, "failed to generate font glyph texture\n");
-		return 0;
 	}
 
 	glBindTexture(GL_TEXTURE_1D, font->tex_glyph);
@@ -78,24 +66,13 @@ init_glyph_texture(struct Font *font, FT_Glyph *glyphs)
 		GL_UNSIGNED_BYTE,
 		data
 	);
+	glBindTexture(GL_TEXTURE_1D, 0);
 
-#ifdef DEBUG
-	GLenum gl_err = glGetError();
-	if (gl_err != GL_NO_ERROR) {
-		fprintf(
-			stderr,
-			"failed to initialize font glyph texture "
-			"(OpenGL error %d)\n",
-			gl_err
-		);
-		glBindTexture(GL_TEXTURE_1D, 0);
+	if (glGetError() != GL_NO_ERROR) {
 		glDeleteTextures(1, &font->tex_glyph);
 		font->tex_glyph = 0;
 		return 0;
 	}
-#endif
-
-	glBindTexture(GL_TEXTURE_1D, 0);
 
 	return 1;
 }
@@ -141,13 +118,6 @@ init_atlas_texture(struct Font *font, FT_Glyph *glyphs)
 	// create the atlas texture
 	glGenTextures(1, &font->tex_atlas);
 	if (!font->tex_atlas) {
-		GLenum gl_err = glGetError();
-		fprintf(
-			stderr,
-			"failed to create font atlas texture "
-			"(OpenGL error %d)\n",
-			gl_err
-		);
 		return 0;
 	}
 
@@ -172,24 +142,13 @@ init_atlas_texture(struct Font *font, FT_Glyph *glyphs)
 		data
 	);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glBindTexture(GL_TEXTURE_RECTANGLE, 0);
 
-#ifdef DEBUG
-	GLenum gl_err = glGetError();
-	if (gl_err != GL_NO_ERROR) {
-		fprintf(
-			stderr,
-			"failed to initialize font atlas texture "
-			"(OpenGL error %d)",
-			gl_err
-		);
-		glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+	if (glGetError() != GL_NO_ERROR) {
 		glDeleteTextures(1, &font->tex_glyph);
 		font->tex_glyph = 0;
 		return 0;
 	}
-#endif
-
-	glBindTexture(GL_TEXTURE_RECTANGLE, 0);
 
 	return 1;
 }
@@ -204,30 +163,11 @@ init_font(struct Font *font, FT_Face face)
 	FT_Glyph glyphs[128];
 
 	for (unsigned char c = 0; c < 128; c++) {
-		if (FT_Load_Char(face, c, FT_LOAD_RENDER) != 0) {
-			fprintf(
-				stderr,
-				"failed to load glyph for character '%c'\n",
-				c
-			);
-			return 0;
-		} else if (FT_Get_Glyph(face->glyph, &glyphs[c]) != 0) {
-			fprintf(
-				stderr,
-				"failed to copy the glyph for character '%c'\n",
-				c
-			);
-			return 0;
-		} else if (FT_Glyph_To_Bitmap(&glyphs[c], FT_RENDER_MODE_NORMAL, NULL, 0) != 0) {
-			fprintf(
-				stderr,
-				"failed render the glyph '%c'\n",
-				c
-			);
+		if (FT_Load_Char(face, c, FT_LOAD_RENDER) != 0 ||
+		    FT_Get_Glyph(face->glyph, &glyphs[c]) != 0 ||
+		    FT_Glyph_To_Bitmap(&glyphs[c], FT_RENDER_MODE_NORMAL, NULL, 0) != 0) {
 			return 0;
 		}
-
-		// create and initialize the character container
 		struct Character *ch = &font->charmap[c];
 		ch->size[0] = face->glyph->bitmap.width;
 		ch->size[1] = face->glyph->bitmap.rows;
@@ -236,7 +176,10 @@ init_font(struct Font *font, FT_Face face)
 		ch->advance = face->glyph->advance.x;
 	}
 
-	int ok = init_glyph_texture(font, glyphs) && init_atlas_texture(font, glyphs);
+	int ok = (
+		init_glyph_texture(font, glyphs) &&
+		init_atlas_texture(font, glyphs)
+	);
 
 	for (unsigned char c = 0; c < 128; c++) {
 		FT_Done_Glyph(glyphs[c]);
@@ -253,10 +196,8 @@ font_from_file(const char *filename, unsigned size)
 
 	FT_Face face;
 
-	if (!ft_initialized && !init_freetype()) {
-		return NULL;
-	} else if (FT_New_Face(ft, filename, 0, &face) != 0) {
-		fprintf(stdout, "failed to load font `%s`\n", filename);
+	if ((!ft_initialized && !init_freetype()) ||
+	    FT_New_Face(ft, filename, 0, &face) != 0) {
 		return NULL;
 	}
 
@@ -264,18 +205,12 @@ font_from_file(const char *filename, unsigned size)
 
 	struct Font *font = malloc(sizeof(struct Font));
 	if (!font || !init_font(font, face)) {
-		goto error;
+		font_destroy(font);
+		font = NULL;
 	}
 
-cleanup:
 	FT_Done_Face(face);
-
 	return font;
-
-error:
-	font_destroy(font);
-	font = NULL;
-	goto cleanup;
 }
 
 const struct Character*
