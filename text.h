@@ -17,6 +17,9 @@ int
 text_set_string(struct Text *text, const char *str);
 
 int
+text_set_fmt(struct Text *text, const char *fmt, ...);
+
+int
 text_render(struct Text *text);
 
 void

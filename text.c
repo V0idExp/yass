@@ -2,6 +2,8 @@
 #include "text.h"
 #include <GL/glew.h>
 #include <assert.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -106,6 +108,29 @@ text_set_string(struct Text *text, const char *str)
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	return glGetError() == GL_NO_ERROR;
+}
+
+int
+text_set_fmt(struct Text *text, const char *fmt, ...)
+{
+	va_list ap, ap_copy;
+	va_start(ap, fmt);
+
+	va_copy(ap_copy, ap);
+	size_t len = vsnprintf(NULL, 0, fmt, ap_copy) + 1;
+	va_end(ap_copy);
+	char str[len + 1];
+	str[len] = 0;
+
+	int ok = 1;
+	va_copy(ap_copy, ap);
+	if (vsnprintf(str, len, fmt, ap)) {
+		ok = text_set_string(text, str);
+	}
+	va_end(ap_copy);
+
+	va_end(ap);
+	return ok;
 }
 
 void

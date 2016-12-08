@@ -278,15 +278,15 @@ main(int argc, char *argv[])
 			time_acc -= 1.0;
 
 			// update fps
-			char *str = string_fmt("FPS: %d", frame_count);
-			text_set_string(fps_text, str);
-			free(str);
+			text_set_fmt(fps_text, "FPS: %d", frame_count);
 			frame_count = 0;
 
 			// update render time
-			str = string_fmt("Render time: %dms", render_time);
-			text_set_string(render_time_text, str);
-			free(str);
+			text_set_fmt(
+				render_time_text,
+				"Render time: %dms",
+				render_time
+			);
 		}
 	}
 
@@ -300,7 +300,6 @@ cleanup:
 	if (!ok) {
 		error_dump(stdout);
 	}
-
 
 	printf(ok ? "Bye!\n" : "Oops!\n");
 	return !(ok == 1);
