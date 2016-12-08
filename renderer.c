@@ -6,6 +6,7 @@
 #include "shader.h"
 #include "sprite.h"
 #include "text.h"
+#include "texture.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -313,7 +314,7 @@ render_sprite_node(const struct RenderNode *node)
 
 	// render
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
-	glBindTexture(GL_TEXTURE_RECTANGLE, node->sprite->texture);
+	glBindTexture(GL_TEXTURE_RECTANGLE, node->sprite->texture->hnd);
 	glBindVertexArray(node->sprite->vao);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	ok &= glGetError() == GL_NO_ERROR;

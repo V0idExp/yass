@@ -4,7 +4,7 @@
 
 struct Sprite {
 	GLuint vao;
-	GLuint texture;
+	struct Texture *texture;
 	int width, height;
 };
 
