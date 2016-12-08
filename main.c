@@ -12,48 +12,76 @@
 #include <GL/glew.h>
 #include <SDL.h>
 #include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
-
-/*** GLOBALS ***/
-static unsigned fps = 0;
 
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
-static struct Font *font_ui = NULL;
+static struct Font *font_dbg = NULL;
+static struct Font *font_hud = NULL;
 static struct Text *fps_text = NULL;
+static struct Text *render_time_text = NULL;
+static struct Text *credits_text = NULL;
+
+// SPITES
+static const struct {
+	const char *file;
+	struct Sprite **var;
+} sprites[] = {
+	{ "data/art/playerShip1_blue.png", &spr_player },
+	{ "data/art/Enemies/enemyBlack2.png", &spr_enemy_01 },
+	{ "data/art/Meteors/meteorGrey_small2.png", &spr_asteroid_01 },
+	{ "data/art/Lasers/laserBlue07.png", &spr_projectile_01 },
+	{ NULL }
+};
+
+// FONTS
+static const struct {
+	const char *file;
+	unsigned size;
+	struct Font **var;
+} fonts[] = {
+	{ "data/fonts/courier.ttf", 16, &font_dbg },
+	{ "data/fonts/kenvector_future_thin.ttf", 16, &font_hud },
+	{ NULL }
+};
 
 static int
 load_resources(void)
 {
 	// load sprites
-	const char *sprite_files[] = {
-		"data/art/playerShip1_blue.png",
-		"data/art/Enemies/enemyBlack2.png",
-		"data/art/Meteors/meteorGrey_small2.png",
-		"data/art/Lasers/laserBlue07.png",
-		NULL
-	};
-	struct Sprite **sprites[] = {
-		&spr_player,
-		&spr_enemy_01,
-		&spr_asteroid_01,
-		&spr_projectile_01
-	};
-	for (int i = 0; sprite_files[i] != NULL; i++) {
-		if (!(*sprites[i] = sprite_from_file(sprite_files[i]))) {
-			fprintf(stderr, "failed to load `%s`\n", sprite_files[i]);
+	for (unsigned i = 0; sprites[i].file != NULL; i++) {
+		if (!(*sprites[i].var = sprite_from_file(sprites[i].file))) {
+			fprintf(
+				stderr,
+				"failed to load sprite `%s`\n",
+				sprites[i].file
+			);
 			return 0;
 		}
-		printf("loaded sprite `%s`\n", sprite_files[i]);
+		printf("loaded sprite `%s`\n", sprites[i].file);
 	}
 
 	// load fonts
-	font_ui = font_from_file("data/fonts/kenvector_future_thin.ttf", 16);
-	if (!font_ui) {
+	for (unsigned i = 0; fonts[i].file != NULL; i++) {
+		if (!(*fonts[i].var = font_from_file(fonts[i].file, fonts[i].size))) {
+			fprintf(
+				stderr,
+				"failed to load font `%s`\n",
+				fonts[i].file
+			);
+			return 0;
+		}
+		printf("loaded font `%s`\n", fonts[i].file);
+	}
+
+	// create text renderables
+	fps_text = text_new(font_dbg);
+	render_time_text = text_new(font_dbg);
+	credits_text = text_new(font_hud);
+	if (!fps_text || !render_time_text || !credits_text) {
 		return 0;
 	}
 
@@ -64,10 +92,18 @@ static void
 cleanup_resources(void)
 {
 	text_destroy(fps_text);
-	font_destroy(font_ui);
-	sprite_destroy(spr_player);
-	sprite_destroy(spr_asteroid_01);
-	sprite_destroy(spr_projectile_01);
+	text_destroy(render_time_text);
+	text_destroy(credits_text);
+
+	// destroy fonts
+	for (unsigned i = 0; fonts[i].file; i++) {
+		font_destroy(*fonts[i].var);
+	}
+
+	// destroy sprites
+	for (unsigned i = 0; sprites[i].file; i++) {
+		sprite_destroy(*sprites[i].var);
+	}
 }
 
 static void
@@ -127,14 +163,27 @@ static void
 render_ui(struct RenderList *rndr_list)
 {
 	// render FPS indicator
-	char *fps_text_str = string_fmt("FPS: %d", fps);
-	text_set_string(fps_text, fps_text_str);
-	free(fps_text_str);
 	render_list_add_text(
 		rndr_list,
 		fps_text,
 		-SCREEN_WIDTH / 2,
 		-SCREEN_HEIGHT / 2
+	);
+
+	// render render time indicator
+	render_list_add_text(
+		rndr_list,
+		render_time_text,
+		-SCREEN_WIDTH / 2,
+		-SCREEN_HEIGHT / 2 + 20
+	);
+
+	// render credits counter
+	render_list_add_text(
+		rndr_list,
+		credits_text,
+		SCREEN_WIDTH / 2 - 150,
+		-SCREEN_HEIGHT / 2 + 20
 	);
 }
 
@@ -203,18 +252,19 @@ main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	// create FPS text
-	fps_text = text_new(font_ui);
-	if (!fps_text) {
-		ok = 0;
-		goto cleanup;
-	}
-
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
 	float tick = 0, time_acc = 0;
-	unsigned frame_count = 0;
+	unsigned frame_count = 0, current_credits;
 	while (ok && run) {
+		// compute timers and counters
+		Uint32 now = SDL_GetTicks();
+		float dt = (now - last_update) / 1000.0f;
+		last_update = now;
+		tick += dt;
+		time_acc += dt;
+		frame_count++;
+
 		// handle input
 		SDL_Event evt;
 		while (SDL_PollEvent(&evt)) {
@@ -230,20 +280,13 @@ main(int argc, char *argv[])
 			}
 		}
 
-		// compute delta time and update the world
-		Uint32 now = SDL_GetTicks();
-		float dt = (now - last_update) / 1000.0f;
-		last_update = now;
-		tick += dt;
+		// update the world
+		run &= world_update(world, dt);
 
-		// update FPS counter
-		time_acc += dt;
-		if (time_acc >= 1.0) {
-			time_acc -= 1.0;
-			fps = frame_count;
-			frame_count = 0;
-		} else {
-			frame_count++;
+		// update credits text
+		if (world->player.credits != current_credits) {
+			current_credits = world->player.credits;
+			text_set_fmt(credits_text, "Credits: %d$", current_credits);
 		}
 
 		// notify script environment
@@ -252,15 +295,30 @@ main(int argc, char *argv[])
 			ok &= script_env_tick(env);
 		}
 
-		// update the world
-		run &= world_update(world, dt);
-
 		// render!
+		now = SDL_GetTicks();
 		renderer_clear();
 		render_world(rndr_list, world);
 		render_ui(rndr_list);
 		render_list_exec(rndr_list);
 		renderer_present();
+		Uint32 render_time = SDL_GetTicks() - now;
+
+		// each second, update the stats
+		if (time_acc >= 1.0) {
+			time_acc -= 1.0;
+
+			// update fps
+			text_set_fmt(fps_text, "FPS: %d", frame_count);
+			frame_count = 0;
+
+			// update render time
+			text_set_fmt(
+				render_time_text,
+				"Render time: %dms",
+				render_time
+			);
+		}
 	}
 
 cleanup:
@@ -273,7 +331,6 @@ cleanup:
 	if (!ok) {
 		error_dump(stdout);
 	}
-
 
 	printf(ok ? "Bye!\n" : "Oops!\n");
 	return !(ok == 1);

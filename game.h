@@ -14,6 +14,7 @@
 
 #define ENEMY_INITIAL_HITPOINTS 30.0
 #define ENEMY_COLLISION_DAMAGE 50
+#define ENEMY_CREDIT_YIELD 25
 
 #define ASTEROID_COLLISION_DAMAGE 20.0
 
@@ -49,6 +50,7 @@ enum {
 	EVENT_PLAYER_HIT = 1,
 	EVENT_ENEMY_HIT,
 	EVENT_PLAYER_COLLISION,
+	EVENT_ENEMY_KILL,
 };
 
 /**
@@ -58,6 +60,7 @@ struct Player {
 	float x, y;
 	struct Body body;
 	float hitpoints;
+	int credits;
 	int actions;
 	float speed;
 	float shoot_cooldown;

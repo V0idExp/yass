@@ -168,6 +168,7 @@ renderer_init(unsigned width, unsigned height)
 		error(ERR_SDL);
 		goto error;
 	}
+	SDL_GL_SetSwapInterval(0);
 
 	// initialize GLEW
 	glewExperimental = GL_TRUE;
