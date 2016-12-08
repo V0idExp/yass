@@ -8,7 +8,6 @@ struct Text {
 	GLuint chars;
 	unsigned width;
 	unsigned height;
-	char *string;
 };
 
 struct Text*
