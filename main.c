@@ -9,6 +9,8 @@
 #include "sprite.h"
 #include "strutils.h"
 #include "text.h"
+#include "texture.h"
+#include "widget.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <assert.h>
@@ -24,6 +26,20 @@ static struct Font *font_hud = NULL;
 static struct Text *fps_text = NULL;
 static struct Text *render_time_text = NULL;
 static struct Text *credits_text = NULL;
+static struct Widget *hp_bar = NULL;
+static struct Widget *hp_bar_bg = NULL;
+static struct Texture *tex_hp_bar_green = NULL;
+static struct Texture *tex_hp_bar_bg = NULL;
+
+// TEXTURES
+static const struct TextureRes {
+	const char *file;
+	struct Texture **var;
+} textures[] = {
+	{ "data/art/UI/squareGreen.png", &tex_hp_bar_green },
+	{ "data/art/UI/squareRed.png", &tex_hp_bar_bg },
+	{ NULL }
+};
 
 // SPITES
 static const struct {
@@ -51,6 +67,20 @@ static const struct {
 static int
 load_resources(void)
 {
+	// load textures
+	for (unsigned i = 0; textures[i].file != NULL; i++) {
+		struct TextureRes res = textures[i];
+		if (!(*res.var = texture_from_file(res.file))) {
+			fprintf(
+				stderr,
+				"failed to load texture `%s`\n",
+				res.file
+			);
+			return 0;
+		}
+		printf("loaded texure `%s`\n", res.file);
+	}
+
 	// load sprites
 	for (unsigned i = 0; sprites[i].file != NULL; i++) {
 		if (!(*sprites[i].var = sprite_from_file(sprites[i].file))) {
@@ -85,12 +115,35 @@ load_resources(void)
 		return 0;
 	}
 
+	// create widgets
+	hp_bar = widget_new();
+	if (!hp_bar) {
+		return 0;
+	}
+	hp_bar->texture = tex_hp_bar_green;
+	hp_bar->width = 200;
+	hp_bar->height = 26;
+	hp_bar->border.left = 6;
+	hp_bar->border.right = 6;
+
+	hp_bar_bg = widget_new();
+	if (!hp_bar_bg) {
+		return 0;
+	}
+	hp_bar_bg->texture = tex_hp_bar_bg;
+	hp_bar_bg->width = 200;
+	hp_bar_bg->height = 26;
+	hp_bar_bg->border.left = 6;
+	hp_bar_bg->border.right = 6;
+
 	return 1;
 }
 
 static void
 cleanup_resources(void)
 {
+	widget_destroy(hp_bar_bg);
+	widget_destroy(hp_bar);
 	text_destroy(fps_text);
 	text_destroy(render_time_text);
 	text_destroy(credits_text);
@@ -103,6 +156,11 @@ cleanup_resources(void)
 	// destroy sprites
 	for (unsigned i = 0; sprites[i].file; i++) {
 		sprite_destroy(*sprites[i].var);
+	}
+
+	// destroy textures
+	for (unsigned i = 0; textures[i].file; i++) {
+		texture_destroy(*textures[i].var);
 	}
 }
 
@@ -167,7 +225,7 @@ render_ui(struct RenderList *rndr_list)
 		rndr_list,
 		fps_text,
 		-SCREEN_WIDTH / 2,
-		-SCREEN_HEIGHT / 2
+		-SCREEN_HEIGHT / 2 + 60
 	);
 
 	// render render time indicator
@@ -175,7 +233,7 @@ render_ui(struct RenderList *rndr_list)
 		rndr_list,
 		render_time_text,
 		-SCREEN_WIDTH / 2,
-		-SCREEN_HEIGHT / 2 + 20
+		-SCREEN_HEIGHT / 2 + 80
 	);
 
 	// render credits counter
@@ -184,6 +242,20 @@ render_ui(struct RenderList *rndr_list)
 		credits_text,
 		SCREEN_WIDTH / 2 - 150,
 		-SCREEN_HEIGHT / 2 + 20
+	);
+
+	// render hitpoints widget
+	render_list_add_widget(
+		rndr_list,
+		hp_bar_bg,
+		20,
+		25 - hp_bar_bg->height / 2
+	);
+	render_list_add_widget(
+		rndr_list,
+		hp_bar,
+		20,
+		25 - hp_bar->height / 2
 	);
 }
 
@@ -288,6 +360,9 @@ main(int argc, char *argv[])
 			current_credits = world->player.credits;
 			text_set_fmt(credits_text, "Credits: %d$", current_credits);
 		}
+
+		// update hitpoints widget
+		hp_bar->width = 200.0 * world->player.hitpoints / PLAYER_INITIAL_HITPOINTS;
 
 		// notify script environment
 		while (tick >= TICK) {

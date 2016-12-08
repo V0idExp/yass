@@ -5,6 +5,7 @@
 
 struct Sprite;
 struct Text;
+struct Widget;
 
 /**
  * Render list.
@@ -42,6 +43,17 @@ void
 render_list_add_text(
 	struct RenderList *list,
 	const struct Text *txt,
+	float x,
+	float y
+);
+
+/**
+ * Add a widget to render list.
+ */
+void
+render_list_add_widget(
+	struct RenderList *list,
+	const struct Widget *wdg,
 	float x,
 	float y
 );

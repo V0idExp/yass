@@ -26,7 +26,7 @@ sprite_from_file(const char *filename)
 
 	// generate a VAO for the sprite
 	glGenVertexArrays(1, &spr->vao);
-	if (!spr->vao) {
+	if (glGetError() != GL_NO_ERROR || !spr->vao) {
 		error(ERR_OPENGL);
 		sprite_destroy(spr);
 		return NULL;

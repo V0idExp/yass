@@ -7,6 +7,7 @@
 #include "sprite.h"
 #include "text.h"
 #include "texture.h"
+#include "widget.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,16 +16,19 @@
 #define SPRITE_TEXTURE_UNIT 0
 #define TEXT_GLYPH_TEXTURE_UNIT 1
 #define TEXT_ATLAS_TEXTURE_UNIT 2
+#define WIDGET_TEXTURE_UNIT 3
 
 enum {
 	RENDER_NODE_SPRITE,
-	RENDER_NODE_TEXT
+	RENDER_NODE_TEXT,
+	RENDER_NODE_WIDGET,
 };
 
 static struct Renderer {
 	int initialized;
 	SDL_Window *win;
 	SDL_GLContext *ctx;
+	int width, height;
 	Mat projection;
 	struct {
 		struct Shader *shader;
@@ -39,6 +43,13 @@ static struct Renderer {
 		struct ShaderUniform u_atlas_texture;
 		struct ShaderUniform u_atlas_offset;
 	} text_pipeline;
+	struct {
+		struct Shader *shader;
+		struct ShaderUniform u_texture;
+		struct ShaderUniform u_size;
+		struct ShaderUniform u_border;
+		struct ShaderUniform u_transform;
+	} widget_pipeline;
 } rndr = { 0, NULL, NULL };
 
 struct RenderNode {
@@ -47,6 +58,7 @@ struct RenderNode {
 	union {
 		struct Sprite *sprite;
 		struct Text *text;
+		struct Widget *widget;
 	};
 };
 
@@ -125,6 +137,42 @@ init_text_pipeline(void)
 	return 1;
 }
 
+static int
+init_widget_pipeline(void)
+{
+	// load and compile the shader
+	const char *uniform_names[] = {
+		"tex",
+		"size",
+		"border",
+		"transform",
+		NULL
+	};
+	struct ShaderUniform *uniforms[] = {
+		&rndr.widget_pipeline.u_texture,
+		&rndr.widget_pipeline.u_size,
+		&rndr.widget_pipeline.u_border,
+		&rndr.widget_pipeline.u_transform,
+		NULL
+	};
+	rndr.widget_pipeline.shader = shader_compile(
+		"data/shaders/widget.vert",
+		"data/shaders/widget.frag",
+		uniform_names,
+		uniforms,
+		NULL,
+		NULL
+	);
+	if (!rndr.widget_pipeline.shader) {
+		fprintf(
+			stderr,
+			"failed to initialize widget pipeline\n"
+		);
+		return 0;
+	}
+	return 1;
+}
+
 int
 renderer_init(unsigned width, unsigned height)
 {
@@ -152,6 +200,8 @@ renderer_init(unsigned width, unsigned height)
 		error(ERR_SDL);
 		goto error;
 	}
+	rndr.width = width;
+	rndr.height = height;
 
 	// initialize OpenGL context
 	SDL_GL_SetAttribute(
@@ -185,6 +235,7 @@ renderer_init(unsigned width, unsigned height)
 	printf("GLEW version: %s\n", glewGetString(GLEW_VERSION));
 
 	// initialize OpenGL state machine
+	glCullFace(GL_BACK);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -201,7 +252,8 @@ renderer_init(unsigned width, unsigned height)
 
 	rndr.initialized = (
 		init_sprite_pipeline() &&
-		init_text_pipeline()
+		init_text_pipeline() &&
+		init_widget_pipeline()
 	);
 
 	if (!rndr.initialized) {
@@ -392,6 +444,74 @@ render_text_node(const struct RenderNode *node)
 	return ok;
 }
 
+void
+render_list_add_widget(
+	struct RenderList *list,
+	const struct Widget *wdg,
+	float x,
+	float y
+) {
+	// initialize text render node
+	struct RenderNode *node = &list->nodes[list->len++];
+	node->type = RENDER_NODE_WIDGET;
+	node->widget = (struct Widget*)wdg;
+	mat_ident(&node->transform);
+	mat_translate(&node->transform, x - rndr.width / 2, -y + rndr.height / 2, 0);
+}
+
+static int
+render_widget_node(const struct RenderNode *node)
+{
+	int ok = 1;
+
+	// configure size
+	Vec size = {{ node->widget->width, node->widget->height, 0, 0 }};
+	ok &= shader_uniform_set(
+		&rndr.widget_pipeline.u_size,
+		1,
+		&size
+	);
+
+	// configure border
+	Vec border = {{
+		node->widget->border.left,
+		node->widget->texture->width - node->widget->border.right,
+		0,
+		0
+	}};
+	ok &= shader_uniform_set(
+		&rndr.widget_pipeline.u_border,
+		1,
+		&border
+	);
+
+	// configure transform
+	Mat mvp;
+	mat_mul(&rndr.projection, &node->transform, &mvp);
+	ok &= shader_uniform_set(
+		&rndr.widget_pipeline.u_transform,
+		1,
+		&mvp
+	);
+
+	// configure texture sampler
+	GLuint texture_unit = WIDGET_TEXTURE_UNIT;
+	ok &= shader_uniform_set(
+		&rndr.widget_pipeline.u_texture,
+		1,
+		&texture_unit
+	);
+
+	// render
+	glActiveTexture(GL_TEXTURE0 + texture_unit);
+	glBindTexture(GL_TEXTURE_RECTANGLE, node->widget->texture->hnd);
+	glBindVertexArray(node->widget->vao);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	ok &= glGetError() == GL_NO_ERROR;
+
+	return ok;
+}
+
 static int
 node_cmp(const void *a, const void *b)
 {
@@ -426,6 +546,12 @@ render_list_exec(struct RenderList *list)
 				ok &= shader_bind(rndr.text_pipeline.shader);
 			}
 			ok &= render_text_node(node);
+			break;
+		case RENDER_NODE_WIDGET:
+			if (active != node->type) {
+				ok &= shader_bind(rndr.widget_pipeline.shader);
+			}
+			ok &= render_widget_node(node);
 			break;
 		}
 		active = node->type;
