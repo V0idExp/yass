@@ -241,8 +241,16 @@ update_enemy(void *enemy_ptr, void *ctx_ptr)
 
 	// check enemy conditions and TTL and if not satisfied, destroy it and
 	// remove from the list
-	if (enemy->hitpoints <= 0 ||
-	    (enemy->ttl -= ctx->dt) <= 0) {
+	int destroy = 0;
+	if (enemy->hitpoints <= 0) {
+		destroy = 1;
+		struct Event evt = { EVENT_ENEMY_KILL };
+		add_event(ctx->world, &evt);
+	} else if ((enemy->ttl -= ctx->dt) <= 0) {
+		destroy = 1;
+	}
+
+	if (destroy) {
 		sim_remove_body(ctx->world->sim, &enemy->body);
 		enemy_destroy(enemy);
 		return 0;
@@ -348,6 +356,10 @@ world_update(struct World *world, float dt)
 				ast->ttl = 0;
 				break;
 			}
+			break;
+		case EVENT_ENEMY_KILL:
+			printf("enemy killed!\n");
+			plr->credits += ENEMY_CREDIT_YIELD;
 			break;
 		}
 	}
