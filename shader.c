@@ -29,12 +29,14 @@ compute_uniform_size(struct ShaderUniform *uniform)
 		return uniform->count * sizeof(GLfloat) * 16;
 	case GL_FLOAT_VEC4:
 		return uniform->count * sizeof(GLfloat) * 4;
+	case GL_UNSIGNED_INT_VEC4:
+		return uniform->count * sizeof(GLuint) * 4;
 	case GL_FLOAT_VEC3:
 		return uniform->count * sizeof(GLfloat) * 3;
 	case GL_FLOAT_VEC2:
 		return uniform->count * sizeof(GLfloat) * 2;
 	}
-	fprintf(stderr, 
+	fprintf(stderr,
 		"cannot compute the size of unknown uniform type %d\n",
 		uniform->type
 	);
@@ -95,7 +97,7 @@ shader_source_from_file(const char *filename)
 	} else if (strncmp(ext, ".frag", 4) == 0) {
 		type = GL_FRAGMENT_SHADER;
 	} else {
-		fprintf(stderr, 
+		fprintf(stderr,
 			"bad shader source filename '%s'; "
 			"extension must be .vert or .frag\n",
 			filename
@@ -369,7 +371,7 @@ shader_new(struct ShaderSource **sources, unsigned count)
 	// create shader program
 	prog = glCreateProgram();
 	if (!prog) {
-		fprintf(stderr, 
+		fprintf(stderr,
 			"failed to create shader program (OpenGL error %d)\n",
 			glGetError()
 		);
@@ -495,7 +497,7 @@ shader_bind(struct Shader *s)
 #ifdef DEBUG
 	GLenum gl_err;
 	if ((gl_err = glGetError()) != GL_NO_ERROR) {
-		fprintf(stderr, 
+		fprintf(stderr,
 			"failed to bind shader %d (OpenGL error %d)\n",
 			s->prog,
 			gl_err
@@ -628,6 +630,13 @@ shader_uniform_set(const struct ShaderUniform *uniform, size_t count, ...)
 		glUniform4fv(uniform->loc, count, va_arg(ap, GLfloat*));
 		break;
 
+	case GL_UNSIGNED_INT_VEC4:
+		{
+			Vec fv = *va_arg(ap, Vec*);
+			GLuint uiv[4] = { fv.data[0], fv.data[1], fv.data[2], fv.data[3] };
+			glUniform4uiv(uniform->loc, 1, uiv);
+		}
+		break;
 	case GL_FLOAT_VEC3:
 		{
 			GLfloat data[count][3];
@@ -654,7 +663,7 @@ shader_uniform_set(const struct ShaderUniform *uniform, size_t count, ...)
 #ifdef DEBUG
 	GLenum gl_errno = glGetError();
 	if (gl_errno != GL_NO_ERROR) {
-		fprintf(stderr, 
+		fprintf(stderr,
 			"failed to set shader uniform '%s' (OpenGL error %d)\n",
 			uniform->name,
 			gl_errno

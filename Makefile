@@ -3,7 +3,7 @@ LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config
 OS := $(shell uname -s)
 LUA_LIB = lua/install/lib/liblua.a
 LUA_TARGET :=
-OBJS = renderer.o text.o font.o error.o projectile.o asteroid.o utils.o enemy.o list.o main.o sprite.o memory.o matlib.o shader.o ioutils.o strutils.o script.o physics.o game.o
+OBJS = widget.o texture.o renderer.o text.o font.o error.o projectile.o asteroid.o utils.o enemy.o list.o main.o sprite.o memory.o matlib.o shader.o ioutils.o strutils.o script.o physics.o game.o
 
 ifeq ($(OS), Linux)
 	LUA_TARGET += linux
