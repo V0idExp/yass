@@ -475,9 +475,9 @@ render_widget_node(const struct RenderNode *node)
 	// configure border
 	Vec border = {{
 		node->widget->border.left,
-		node->widget->texture->width - node->widget->border.right,
-		0,
-		0
+		node->widget->border.right,
+		node->widget->border.top,
+		node->widget->border.bottom
 	}};
 	ok &= shader_uniform_set(
 		&rndr.widget_pipeline.u_border,

@@ -9,6 +9,7 @@ struct Widget {
 	unsigned int width, height;
 	struct {
 		uint8_t left, right;
+		uint8_t top, bottom;
 	} border;
 };
 

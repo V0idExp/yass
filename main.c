@@ -16,6 +16,9 @@
 #include <assert.h>
 #include <stdlib.h>
 
+/*** GLOBAL STATE ***/
+static int show_upgrade_shop = 0;
+
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
@@ -28,8 +31,10 @@ static struct Text *render_time_text = NULL;
 static struct Text *credits_text = NULL;
 static struct Widget *hp_bar = NULL;
 static struct Widget *hp_bar_bg = NULL;
+static struct Widget *shop_win_bg = NULL;
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_bg = NULL;
+static struct Texture *tex_shop_win_bg = NULL;
 
 // TEXTURES
 static const struct TextureRes {
@@ -38,6 +43,7 @@ static const struct TextureRes {
 } textures[] = {
 	{ "data/art/UI/squareGreen.png", &tex_hp_bar_green },
 	{ "data/art/UI/squareRed.png", &tex_hp_bar_bg },
+	{ "data/art/UI/metalPanel_red.png", &tex_shop_win_bg },
 	{ NULL }
 };
 
@@ -115,7 +121,7 @@ load_resources(void)
 		return 0;
 	}
 
-	// create widgets
+	// HP bar
 	hp_bar = widget_new();
 	if (!hp_bar) {
 		return 0;
@@ -136,12 +142,26 @@ load_resources(void)
 	hp_bar_bg->border.left = 6;
 	hp_bar_bg->border.right = 6;
 
+	// upgrade shop window
+	shop_win_bg = widget_new();
+	if (!shop_win_bg) {
+		return 0;
+	}
+	shop_win_bg->texture = tex_shop_win_bg;
+	shop_win_bg->width = 400;
+	shop_win_bg->height = 400;
+	shop_win_bg->border.left = 11;
+	shop_win_bg->border.right = 11;
+	shop_win_bg->border.top = 32;
+	shop_win_bg->border.bottom = 13;
+
 	return 1;
 }
 
 static void
 cleanup_resources(void)
 {
+	widget_destroy(shop_win_bg);
 	widget_destroy(hp_bar_bg);
 	widget_destroy(hp_bar);
 	text_destroy(fps_text);
@@ -257,6 +277,14 @@ render_ui(struct RenderList *rndr_list)
 		20,
 		25 - hp_bar->height / 2
 	);
+
+	// render upgrades shop window
+	render_list_add_widget(
+		rndr_list,
+		shop_win_bg,
+		SCREEN_WIDTH / 2 - shop_win_bg->width / 2,
+		SCREEN_HEIGHT / 2 - shop_win_bg->height / 2
+	);
 }
 
 static int
@@ -275,6 +303,9 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 		break;
 	case SDLK_SPACE:
 		act = ACTION_SHOOT;
+		break;
+	case SDLK_u:
+		show_upgrade_shop = !show_upgrade_shop;
 		break;
 	}
 

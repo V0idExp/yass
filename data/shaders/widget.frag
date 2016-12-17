@@ -7,17 +7,24 @@ uniform vec2 size;
 uniform uvec4 border;
 uniform sampler2DRect tex;
 
+float
+clamp_coord(float v, float size, uint low, uint high)
+{
+	uint middle = uint(size) - high;
+	if (v > low && v < size - high) {
+		return float(uint(v) % size);
+	} else if (v >= size - high) {
+		return size - v;
+	}
+	return v;
+}
+
 void
 main()
 {
-	uint left = border.r;
-	uint right = border.g;
-	uint middle = right - left;
-	vec2 norm_uv = uv;
-	if (uv.x > left && uv.x < size.x - right) {
-		norm_uv.x = left + uint(uv.x) % middle;
-	} else if (uv.x > left + middle && uv.x >= size.x - right) {
-		norm_uv.x = size.x - uv.x;
-	}
+	vec2 norm_uv = vec2(
+		clamp_coord(uv.x, size.x, border.r, border.g),
+		clamp_coord(uv.y, size.y, border.b, border.a)
+	);
 	out_color = texture(tex, norm_uv);
 }
