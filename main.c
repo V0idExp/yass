@@ -17,6 +17,7 @@
 #include <stdlib.h>
 
 /*** GLOBAL STATE ***/
+static int pause_game = 0;
 static int show_upgrade_shop = 0;
 
 /*** RESOURCES ***/
@@ -306,17 +307,16 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	case SDLK_SPACE:
 		act = ACTION_SHOOT;
 		break;
-	case SDLK_u:
-		if (key_evt->type == SDL_KEYDOWN) {
-			show_upgrade_shop = !show_upgrade_shop;
-		}
-		break;
 	}
 
 	if (key_evt->type == SDL_KEYUP) {
 		world->player.actions &= ~act;
 	} else {
 		world->player.actions |= act;
+
+		if (key_evt->key.keysym.sym == SDLK_u) {
+			show_upgrade_shop = !show_upgrade_shop;
+		}
 	}
 	return 1;
 }
@@ -365,14 +365,6 @@ main(int argc, char *argv[])
 	unsigned frame_count = 0;
 	int current_credits = -1;
 	while (ok && run) {
-		// compute timers and counters
-		Uint32 now = SDL_GetTicks();
-		float dt = (now - last_update) / 1000.0f;
-		last_update = now;
-		tick += dt;
-		time_acc += dt;
-		frame_count++;
-
 		// handle input
 		SDL_Event evt;
 		while (SDL_PollEvent(&evt)) {
@@ -388,8 +380,26 @@ main(int argc, char *argv[])
 			}
 		}
 
-		// update the world
-		run &= world_update(world, dt);
+		pause_game = show_upgrade_shop;
+
+		// compute timers and counters
+		Uint32 now = SDL_GetTicks();
+		float dt = (now - last_update) / 1000.0f;
+		last_update = now;
+		time_acc += dt;
+		frame_count++;
+
+		if (!pause_game) {
+			// update the world
+			run &= world_update(world, dt);
+
+			// notify script environment
+			tick += dt;
+			while (tick >= TICK) {
+				tick -= TICK;
+				ok &= script_env_tick(env);
+			}
+		}
 
 		// update credits text
 		if (world->player.credits != current_credits) {
@@ -399,12 +409,6 @@ main(int argc, char *argv[])
 
 		// update hitpoints widget
 		hp_bar->width = 200.0 * world->player.hitpoints / PLAYER_INITIAL_HITPOINTS;
-
-		// notify script environment
-		while (tick >= TICK) {
-			tick -= TICK;
-			ok &= script_env_tick(env);
-		}
 
 		// render!
 		now = SDL_GetTicks();
