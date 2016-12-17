@@ -28,7 +28,7 @@ All credits for cool assets go to Kenney game studio.
 The list of dependencies is (hopefully) short and easy to satisfy:
 
  * SDL2
- * SDL2_image
+ * libpng >= 1.2
  * GLEW
  * FreeType2
  * Basic Linear Algebra Subroutines (BLAS) compatible library

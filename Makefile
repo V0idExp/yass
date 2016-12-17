@@ -1,5 +1,5 @@
-CFLAGS := $(CFLAGS) -std=c99 -Wall -Werror -g -DDEBUG -I./lua/install/include `sdl2-config --cflags` `pkg-config --cflags freetype2 glew SDL2_image`
-LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config --libs freetype2 glew SDL2_image`
+CFLAGS := $(CFLAGS) -std=c99 -Wall -Werror -g -DDEBUG -I./lua/install/include `sdl2-config --cflags` `pkg-config --cflags freetype2 glew libpng`
+LDFLAGS := $(LDFLAGS) -L./lua/install/lib -llua `sdl2-config --libs` `pkg-config --libs freetype2 glew libpng`
 OS := $(shell uname -s)
 LUA_LIB = lua/install/lib/liblua.a
 LUA_TARGET :=
