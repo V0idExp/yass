@@ -327,7 +327,8 @@ main(int argc, char *argv[])
 	int run = 1;
 	Uint32 last_update = SDL_GetTicks();
 	float tick = 0, time_acc = 0;
-	unsigned frame_count = 0, current_credits;
+	unsigned frame_count = 0;
+	int current_credits = -1;
 	while (ok && run) {
 		// compute timers and counters
 		Uint32 now = SDL_GetTicks();
