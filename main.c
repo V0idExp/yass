@@ -278,13 +278,15 @@ render_ui(struct RenderList *rndr_list)
 		25 - hp_bar->height / 2
 	);
 
-	// render upgrades shop window
-	render_list_add_widget(
-		rndr_list,
-		shop_win_bg,
-		SCREEN_WIDTH / 2 - shop_win_bg->width / 2,
-		SCREEN_HEIGHT / 2 - shop_win_bg->height / 2
-	);
+	// render upgrades shop window, if needed
+	if (show_upgrade_shop) {
+		render_list_add_widget(
+			rndr_list,
+			shop_win_bg,
+			SCREEN_WIDTH / 2 - shop_win_bg->width / 2,
+			SCREEN_HEIGHT / 2 - shop_win_bg->height / 2
+		);
+	}
 }
 
 static int
@@ -305,7 +307,9 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 		act = ACTION_SHOOT;
 		break;
 	case SDLK_u:
-		show_upgrade_shop = !show_upgrade_shop;
+		if (key_evt->type == SDL_KEYDOWN) {
+			show_upgrade_shop = !show_upgrade_shop;
+		}
 		break;
 	}
 
