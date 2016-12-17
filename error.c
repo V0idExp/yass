@@ -19,8 +19,12 @@ static const char *err_msgs[] = {
 	"SDL internal error",
 	// ERR_OPENGL
 	"OpenGL internal error",
+	// ERR_LIBPNG
+	"libpng internal error",
 	// ERR_FILE_READ
 	"file read error",
+	// ERR_FILE_BAD
+	"bad file",
 	// ERR_SCRIPT_INIT
 	"script environment initialization failure",
 	// ERR_SCRIPT_LOAD
