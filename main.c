@@ -152,6 +152,19 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	return 1;
 }
 
+static int
+handle_mouse(const SDL_Event *mouse_evt)
+{
+	if (mouse_evt->button.button == SDL_BUTTON_LEFT &&
+	    mouse_evt->button.clicks == 1) {
+		return ui_handle_click(
+			mouse_evt->button.x,
+			mouse_evt->button.y
+		);
+	}
+	return 1;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -222,6 +235,8 @@ main(int argc, char *argv[])
 				run &= handle_key(&evt, world);
 			} else if (evt.type == SDL_QUIT) {
 				run = 0;
+			} else if (evt.type == SDL_MOUSEBUTTONUP) {
+				run &= handle_mouse(&evt);
 			}
 		}
 

@@ -1,10 +1,20 @@
 #include "font.h"
+#include "game.h"
 #include "renderer.h"
 #include "state.h"
 #include "text.h"
 #include "texture.h"
 #include "widget.h"
-#include "game.h"
+
+struct Button {
+	int (*on_click)(void);
+	int x, y;
+	int w, h;
+};
+
+enum {
+	SHOP_WIN_UPGRADE_BTN,
+};
 
 /*** UI STATE ***/
 static struct {
@@ -49,7 +59,15 @@ static const struct {
 };
 
 static int
+on_click_upgrade_btn(void);
+
+static int
 ui_init(void);
+
+// Upgrade shop window buttons
+static struct Button shop_win_buttons[] = {
+	{ on_click_upgrade_btn }
+};
 
 int
 ui_load(void)
@@ -151,6 +169,12 @@ ui_init(void)
 	shop_win_bg->border.top = 32;
 	shop_win_bg->border.bottom = 13;
 
+	// initialize buttons
+	shop_win_buttons[SHOP_WIN_UPGRADE_BTN].x = SCREEN_WIDTH / 2 - 200;
+	shop_win_buttons[SHOP_WIN_UPGRADE_BTN].y = SCREEN_HEIGHT / 2 - 200;
+	shop_win_buttons[SHOP_WIN_UPGRADE_BTN].w = 400;
+	shop_win_buttons[SHOP_WIN_UPGRADE_BTN].h = 400;
+
 	return 1;
 }
 
@@ -251,4 +275,41 @@ ui_render(struct RenderList *rndr_list)
 			SCREEN_HEIGHT / 2 - shop_win_bg->height / 2
 		);
 	}
+}
+
+static int
+dispatch_click(struct Button *buttons, unsigned count, int x, int y)
+{
+	for (size_t i = 0; i < count; i++) {
+		int x1 = buttons[i].x, x2 = buttons[i].x + buttons[i].w;
+		int y1 = buttons[i].y, y2 = buttons[i].y + buttons[i].h;
+
+		if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+			if (!buttons[i].on_click()) {
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
+int
+ui_handle_click(int x, int y)
+{
+	if (ui_state.show_upgrade_shop) {
+		return dispatch_click(
+			shop_win_buttons,
+			sizeof(shop_win_buttons) / sizeof(struct Button),
+			x,
+			y
+		);
+	}
+	return 1;
+}
+
+static int
+on_click_upgrade_btn(void)
+{
+	printf("Upgrade!\n");
+	return 1;
 }
