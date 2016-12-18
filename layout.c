@@ -188,7 +188,7 @@ static void
 compute_elem_layout_op(void *data, void *userdata)
 {
 	int *ok = userdata;
-	*ok = element_compute_layout(data);
+	*ok &= element_compute_layout(data);
 }
 
 int
