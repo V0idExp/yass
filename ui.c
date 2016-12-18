@@ -23,15 +23,18 @@ static struct {
 /*** RESOURCES ***/
 static struct Font *font_dbg = NULL;
 static struct Font *font_hud = NULL;
-static struct Text *fps_text = NULL;
-static struct Text *render_time_text = NULL;
-static struct Text *credits_text = NULL;
+
+static struct Text *text_fps = NULL;
+static struct Text *text_render_time = NULL;
+static struct Text *text_credits = NULL;
+
 static struct Widget *hp_bar = NULL;
 static struct Widget *hp_bar_bg = NULL;
-static struct Widget *upgrades_win_bg = NULL;
+static struct Widget *upgrades_win = NULL;
+
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_bg = NULL;
-static struct Texture *tex_upgrades_win_bg = NULL;
+static struct Texture *tex_win = NULL;
 
 // TEXTURES
 static const struct TextureRes {
@@ -40,7 +43,7 @@ static const struct TextureRes {
 } textures[] = {
 	{ "data/art/UI/squareGreen.png", &tex_hp_bar_green },
 	{ "data/art/UI/squareRed.png", &tex_hp_bar_bg },
-	{ "data/art/UI/metalPanel_red.png", &tex_upgrades_win_bg },
+	{ "data/art/UI/metalPanel_red.png", &tex_win },
 	{ NULL }
 };
 
@@ -57,10 +60,10 @@ static const struct {
 
 // LAYOUT ELEMENTS
 static struct Element *e_root = NULL;
-static struct Element *e_credits_text = NULL;
+static struct Element *e_text_credits = NULL;
 static struct Element *e_hp_bar = NULL;
-static struct Element *e_fps_text = NULL;
-static struct Element *e_render_time_text = NULL;
+static struct Element *e_text_fps = NULL;
+static struct Element *e_text_render_time = NULL;
 static struct Element *e_upgrades_win = NULL;
 
 static const struct {
@@ -94,7 +97,7 @@ static const struct {
 	},
 	// credits text widget
 	{
-		.var = &e_credits_text,
+		.var = &e_text_credits,
 		.parent = &e_root,
 		.anchors = {
 			.top = ANCHOR_TOP,
@@ -107,7 +110,7 @@ static const struct {
 	},
 	// FPS text widget
 	{
-		.var = &e_fps_text,
+		.var = &e_text_fps,
 		.parent = &e_hp_bar,
 		.anchors = {
 			.top = ANCHOR_BOTTOM,
@@ -119,8 +122,8 @@ static const struct {
 	},
 	// render time text widget
 	{
-		.var = &e_render_time_text,
-		.parent = &e_fps_text,
+		.var = &e_text_render_time,
+		.parent = &e_text_fps,
 		.anchors = {
 			.top = ANCHOR_BOTTOM,
 			.left = ANCHOR_LEFT,
@@ -156,8 +159,8 @@ static struct Button upgrades_win_buttons[] = {
 static void
 update_credits(int credits)
 {
-	text_set_fmt(credits_text, "Credits: %d$", credits);
-	e_credits_text->height = credits_text->height;
+	text_set_fmt(text_credits, "Credits: %d$", credits);
+	e_text_credits->height = text_credits->height;
 }
 
 static void
@@ -192,10 +195,10 @@ ui_init(void)
 	}
 
 	// create text renderables
-	fps_text = text_new(font_dbg);
-	render_time_text = text_new(font_dbg);
-	credits_text = text_new(font_hud);
-	if (!fps_text || !render_time_text || !credits_text) {
+	text_fps = text_new(font_dbg);
+	text_render_time = text_new(font_dbg);
+	text_credits = text_new(font_hud);
+	if (!text_fps || !text_render_time || !text_credits) {
 		return 0;
 	}
 
@@ -219,15 +222,15 @@ ui_init(void)
 	hp_bar_bg->border.right = 6;
 
 	// upgrade shop window
-	upgrades_win_bg = widget_new();
-	if (!upgrades_win_bg) {
+	upgrades_win = widget_new();
+	if (!upgrades_win) {
 		return 0;
 	}
-	upgrades_win_bg->texture = tex_upgrades_win_bg;
-	upgrades_win_bg->border.left = 11;
-	upgrades_win_bg->border.right = 11;
-	upgrades_win_bg->border.top = 32;
-	upgrades_win_bg->border.bottom = 13;
+	upgrades_win->texture = tex_win;
+	upgrades_win->border.left = 11;
+	upgrades_win->border.right = 11;
+	upgrades_win->border.top = 32;
+	upgrades_win->border.bottom = 13;
 
 	return 1;
 }
@@ -269,12 +272,12 @@ void
 ui_cleanup(void)
 {
 	element_destroy(e_root);
-	widget_destroy(upgrades_win_bg);
+	widget_destroy(upgrades_win);
 	widget_destroy(hp_bar_bg);
 	widget_destroy(hp_bar);
-	text_destroy(fps_text);
-	text_destroy(render_time_text);
-	text_destroy(credits_text);
+	text_destroy(text_fps);
+	text_destroy(text_render_time);
+	text_destroy(text_credits);
 
 	// destroy fonts
 	for (unsigned i = 0; fonts[i].file; i++) {
@@ -304,17 +307,17 @@ ui_update(const struct State *state, float dt)
 	time_acc += dt;
 	if (time_acc >= 1.0) {
 		time_acc -= 1.0;
-		text_set_fmt(fps_text, "FPS: %d", state->fps);
-		e_fps_text->width = fps_text->width;
-		e_fps_text->height = fps_text->height;
+		text_set_fmt(text_fps, "FPS: %d", state->fps);
+		e_text_fps->width = text_fps->width;
+		e_text_fps->height = text_fps->height;
 
 		text_set_fmt(
-			render_time_text,
+			text_render_time,
 			"Render time: %dms",
 			state->render_time
 		);
-		e_render_time_text->width = render_time_text->width;
-		e_render_time_text->height = render_time_text->height;
+		e_text_render_time->width = text_render_time->width;
+		e_text_render_time->height = text_render_time->height;
 	}
 
 	// update credits text
@@ -339,8 +342,8 @@ ui_update(const struct State *state, float dt)
 	hp_bar->height = e_hp_bar->height;
 	hp_bar_bg->width = e_hp_bar->width;
 	hp_bar_bg->height = e_hp_bar->height;
-	upgrades_win_bg->width = e_upgrades_win->width;
-	upgrades_win_bg->height = e_upgrades_win->height;
+	upgrades_win->width = e_upgrades_win->width;
+	upgrades_win->height = e_upgrades_win->height;
 
 	prev_state = *state;
 
@@ -353,25 +356,25 @@ ui_render(struct RenderList *rndr_list)
 	// render FPS indicator
 	render_list_add_text(
 		rndr_list,
-		fps_text,
-		e_fps_text->x,
-		e_fps_text->y
+		text_fps,
+		e_text_fps->x,
+		e_text_fps->y
 	);
 
 	// render render time indicator
 	render_list_add_text(
 		rndr_list,
-		render_time_text,
-		e_render_time_text->x,
-		e_render_time_text->y
+		text_render_time,
+		e_text_render_time->x,
+		e_text_render_time->y
 	);
 
 	// render credits counter
 	render_list_add_text(
 		rndr_list,
-		credits_text,
-		e_credits_text->x,
-		e_credits_text->y
+		text_credits,
+		e_text_credits->x,
+		e_text_credits->y
 	);
 
 	// render hitpoints widget
@@ -392,7 +395,7 @@ ui_render(struct RenderList *rndr_list)
 	if (ui_state.show_upgrades_win) {
 		render_list_add_widget(
 			rndr_list,
-			upgrades_win_bg,
+			upgrades_win,
 			e_upgrades_win->x,
 			e_upgrades_win->y
 		);
