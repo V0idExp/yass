@@ -1,54 +1,34 @@
 #include "error.h"
-#include "font.h"
 #include "game.h"
-#include "matlib.h"
-#include "memory.h"
 #include "renderer.h"
 #include "script.h"
-#include "shader.h"
 #include "sprite.h"
-#include "strutils.h"
-#include "text.h"
-#include "texture.h"
-#include "widget.h"
+#include "state.h"
+#include "ui.h"
 #include <GL/glew.h>
 #include <SDL.h>
 #include <assert.h>
 #include <stdlib.h>
 
 /*** GLOBAL STATE ***/
-static int pause_game = 0;
-static int show_upgrade_shop = 0;
+static struct State state = {
+	.game_paused = 0,
+	.show_upgrade_shop = 0,
+
+	.credits = 0,
+	.hitpoints = 0,
+
+	.fps = 0,
+	.render_time = 0
+};
 
 /*** RESOURCES ***/
 static struct Sprite *spr_player = NULL;
 static struct Sprite *spr_enemy_01 = NULL;
 static struct Sprite *spr_asteroid_01 = NULL;
 static struct Sprite *spr_projectile_01 = NULL;
-static struct Font *font_dbg = NULL;
-static struct Font *font_hud = NULL;
-static struct Text *fps_text = NULL;
-static struct Text *render_time_text = NULL;
-static struct Text *credits_text = NULL;
-static struct Widget *hp_bar = NULL;
-static struct Widget *hp_bar_bg = NULL;
-static struct Widget *shop_win_bg = NULL;
-static struct Texture *tex_hp_bar_green = NULL;
-static struct Texture *tex_hp_bar_bg = NULL;
-static struct Texture *tex_shop_win_bg = NULL;
 
-// TEXTURES
-static const struct TextureRes {
-	const char *file;
-	struct Texture **var;
-} textures[] = {
-	{ "data/art/UI/squareGreen.png", &tex_hp_bar_green },
-	{ "data/art/UI/squareRed.png", &tex_hp_bar_bg },
-	{ "data/art/UI/metalPanel_red.png", &tex_shop_win_bg },
-	{ NULL }
-};
-
-// SPITES
+// SPRITES
 static const struct {
 	const char *file;
 	struct Sprite **var;
@@ -60,34 +40,9 @@ static const struct {
 	{ NULL }
 };
 
-// FONTS
-static const struct {
-	const char *file;
-	unsigned size;
-	struct Font **var;
-} fonts[] = {
-	{ "data/fonts/courier.ttf", 16, &font_dbg },
-	{ "data/fonts/kenvector_future_thin.ttf", 16, &font_hud },
-	{ NULL }
-};
-
 static int
 load_resources(void)
 {
-	// load textures
-	for (unsigned i = 0; textures[i].file != NULL; i++) {
-		struct TextureRes res = textures[i];
-		if (!(*res.var = texture_from_file(res.file))) {
-			fprintf(
-				stderr,
-				"failed to load texture `%s`\n",
-				res.file
-			);
-			return 0;
-		}
-		printf("loaded texure `%s`\n", res.file);
-	}
-
 	// load sprites
 	for (unsigned i = 0; sprites[i].file != NULL; i++) {
 		if (!(*sprites[i].var = sprite_from_file(sprites[i].file))) {
@@ -101,87 +56,15 @@ load_resources(void)
 		printf("loaded sprite `%s`\n", sprites[i].file);
 	}
 
-	// load fonts
-	for (unsigned i = 0; fonts[i].file != NULL; i++) {
-		if (!(*fonts[i].var = font_from_file(fonts[i].file, fonts[i].size))) {
-			fprintf(
-				stderr,
-				"failed to load font `%s`\n",
-				fonts[i].file
-			);
-			return 0;
-		}
-		printf("loaded font `%s`\n", fonts[i].file);
-	}
-
-	// create text renderables
-	fps_text = text_new(font_dbg);
-	render_time_text = text_new(font_dbg);
-	credits_text = text_new(font_hud);
-	if (!fps_text || !render_time_text || !credits_text) {
-		return 0;
-	}
-
-	// HP bar
-	hp_bar = widget_new();
-	if (!hp_bar) {
-		return 0;
-	}
-	hp_bar->texture = tex_hp_bar_green;
-	hp_bar->width = 200;
-	hp_bar->height = 26;
-	hp_bar->border.left = 6;
-	hp_bar->border.right = 6;
-
-	hp_bar_bg = widget_new();
-	if (!hp_bar_bg) {
-		return 0;
-	}
-	hp_bar_bg->texture = tex_hp_bar_bg;
-	hp_bar_bg->width = 200;
-	hp_bar_bg->height = 26;
-	hp_bar_bg->border.left = 6;
-	hp_bar_bg->border.right = 6;
-
-	// upgrade shop window
-	shop_win_bg = widget_new();
-	if (!shop_win_bg) {
-		return 0;
-	}
-	shop_win_bg->texture = tex_shop_win_bg;
-	shop_win_bg->width = 400;
-	shop_win_bg->height = 400;
-	shop_win_bg->border.left = 11;
-	shop_win_bg->border.right = 11;
-	shop_win_bg->border.top = 32;
-	shop_win_bg->border.bottom = 13;
-
 	return 1;
 }
 
 static void
 cleanup_resources(void)
 {
-	widget_destroy(shop_win_bg);
-	widget_destroy(hp_bar_bg);
-	widget_destroy(hp_bar);
-	text_destroy(fps_text);
-	text_destroy(render_time_text);
-	text_destroy(credits_text);
-
-	// destroy fonts
-	for (unsigned i = 0; fonts[i].file; i++) {
-		font_destroy(*fonts[i].var);
-	}
-
 	// destroy sprites
 	for (unsigned i = 0; sprites[i].file; i++) {
 		sprite_destroy(*sprites[i].var);
-	}
-
-	// destroy textures
-	for (unsigned i = 0; textures[i].file; i++) {
-		texture_destroy(*textures[i].var);
 	}
 }
 
@@ -238,58 +121,6 @@ render_world(struct RenderList *rndr_list, struct World *world)
 	}
 }
 
-static void
-render_ui(struct RenderList *rndr_list)
-{
-	// render FPS indicator
-	render_list_add_text(
-		rndr_list,
-		fps_text,
-		-SCREEN_WIDTH / 2,
-		-SCREEN_HEIGHT / 2 + 60
-	);
-
-	// render render time indicator
-	render_list_add_text(
-		rndr_list,
-		render_time_text,
-		-SCREEN_WIDTH / 2,
-		-SCREEN_HEIGHT / 2 + 80
-	);
-
-	// render credits counter
-	render_list_add_text(
-		rndr_list,
-		credits_text,
-		SCREEN_WIDTH / 2 - 150,
-		-SCREEN_HEIGHT / 2 + 20
-	);
-
-	// render hitpoints widget
-	render_list_add_widget(
-		rndr_list,
-		hp_bar_bg,
-		20,
-		25 - hp_bar_bg->height / 2
-	);
-	render_list_add_widget(
-		rndr_list,
-		hp_bar,
-		20,
-		25 - hp_bar->height / 2
-	);
-
-	// render upgrades shop window, if needed
-	if (show_upgrade_shop) {
-		render_list_add_widget(
-			rndr_list,
-			shop_win_bg,
-			SCREEN_WIDTH / 2 - shop_win_bg->width / 2,
-			SCREEN_HEIGHT / 2 - shop_win_bg->height / 2
-		);
-	}
-}
-
 static int
 handle_key(const SDL_Event *key_evt, struct World *world)
 {
@@ -315,7 +146,7 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 		world->player.actions |= act;
 
 		if (key_evt->key.keysym.sym == SDLK_u) {
-			show_upgrade_shop = !show_upgrade_shop;
+			state.show_upgrade_shop = !state.show_upgrade_shop;
 		}
 	}
 	return 1;
@@ -342,7 +173,7 @@ main(int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if (!(ok = load_resources())) {
+	if (!(ok = (load_resources() && ui_load()))) {
 		goto cleanup;
 	}
 
@@ -363,8 +194,22 @@ main(int argc, char *argv[])
 	Uint32 last_update = SDL_GetTicks();
 	float tick = 0, time_acc = 0;
 	unsigned frame_count = 0;
-	int current_credits = -1;
 	while (ok && run) {
+		// compute time delta, update timers and counters
+		Uint32 now = SDL_GetTicks();
+		float dt = (now - last_update) / 1000.0f;
+		last_update = now;
+		time_acc += dt;
+		if (time_acc >= 1.0) {
+			time_acc -= 1.0;
+
+			// update fps
+			state.fps = frame_count;
+			frame_count = 0;
+		} else {
+			frame_count++;
+		}
+
 		// handle input
 		SDL_Event evt;
 		while (SDL_PollEvent(&evt)) {
@@ -380,16 +225,9 @@ main(int argc, char *argv[])
 			}
 		}
 
-		pause_game = show_upgrade_shop;
-
-		// compute timers and counters
-		Uint32 now = SDL_GetTicks();
-		float dt = (now - last_update) / 1000.0f;
-		last_update = now;
-		time_acc += dt;
-		frame_count++;
-
-		if (!pause_game) {
+		// update the game
+		state.game_paused = state.show_upgrade_shop;
+		if (!state.game_paused) {
 			// update the world
 			run &= world_update(world, dt);
 
@@ -399,46 +237,29 @@ main(int argc, char *argv[])
 				tick -= TICK;
 				ok &= script_env_tick(env);
 			}
+
+			// update the state
+			state.credits = world->player.credits;
+			state.hitpoints = world->player.hitpoints;
 		}
 
-		// update credits text
-		if (world->player.credits != current_credits) {
-			current_credits = world->player.credits;
-			text_set_fmt(credits_text, "Credits: %d$", current_credits);
-		}
+		// update the UI
+		ok &= ui_update(&state, dt);
 
-		// update hitpoints widget
-		hp_bar->width = 200.0 * world->player.hitpoints / PLAYER_INITIAL_HITPOINTS;
-
-		// render!
+		// render and measure rendering time
 		now = SDL_GetTicks();
 		renderer_clear();
 		render_world(rndr_list, world);
-		render_ui(rndr_list);
+		ui_render(rndr_list);
 		render_list_exec(rndr_list);
 		renderer_present();
-		Uint32 render_time = SDL_GetTicks() - now;
-
-		// each second, update the stats
-		if (time_acc >= 1.0) {
-			time_acc -= 1.0;
-
-			// update fps
-			text_set_fmt(fps_text, "FPS: %d", frame_count);
-			frame_count = 0;
-
-			// update render time
-			text_set_fmt(
-				render_time_text,
-				"Render time: %dms",
-				render_time
-			);
-		}
+		state.render_time = SDL_GetTicks() - now;
 	}
 
 cleanup:
 	script_env_destroy(env);
 	world_destroy(world);
+	ui_cleanup();
 	cleanup_resources();
 	renderer_shutdown();
 
