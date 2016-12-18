@@ -13,7 +13,7 @@
 /*** GLOBAL STATE ***/
 static struct State state = {
 	.game_paused = 0,
-	.show_upgrade_shop = 0,
+	.show_upgrades_shop = 0,
 
 	.credits = 0,
 	.hitpoints = 0,
@@ -146,7 +146,7 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 		world->player.actions |= act;
 
 		if (key_evt->key.keysym.sym == SDLK_u) {
-			state.show_upgrade_shop = !state.show_upgrade_shop;
+			state.show_upgrades_shop = !state.show_upgrades_shop;
 		}
 	}
 	return 1;
@@ -241,7 +241,7 @@ main(int argc, char *argv[])
 		}
 
 		// update the game
-		state.game_paused = state.show_upgrade_shop;
+		state.game_paused = state.show_upgrades_shop;
 		if (!state.game_paused) {
 			// update the world
 			run &= world_update(world, dt);

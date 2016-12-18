@@ -31,6 +31,8 @@ static const char *err_msgs[] = {
 	"script file load failure",
 	// ERR_SCRIPT_CALL
 	"script function call failure",
+	// ERR_INVALID_ANCHORS
+	"invalid element anchors",
 };
 
 void

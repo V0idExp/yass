@@ -2,7 +2,7 @@
 
 struct State {
 	int game_paused;
-	int show_upgrade_shop;
+	int show_upgrades_shop;
 
 	int credits;
 	int hitpoints;

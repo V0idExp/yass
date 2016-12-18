@@ -386,7 +386,7 @@ render_list_add_text(
 	node->type = RENDER_NODE_TEXT;
 	node->text = (struct Text*)txt;
 	mat_ident(&node->transform);
-	mat_translate(&node->transform, x, -y, 0);
+	mat_translate(&node->transform, x - rndr.width / 2, -y + rndr.height / 2, 0);
 }
 
 static int
