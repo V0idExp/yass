@@ -1,5 +1,6 @@
 #include "error.h"
 #include "font.h"
+#include "image.h"
 #include "matlib.h"
 #include "memory.h"
 #include "renderer.h"
@@ -7,7 +8,6 @@
 #include "sprite.h"
 #include "text.h"
 #include "texture.h"
-#include "widget.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,7 +49,7 @@ static struct Renderer {
 		struct ShaderUniform u_size;
 		struct ShaderUniform u_border;
 		struct ShaderUniform u_transform;
-	} widget_pipeline;
+	} image_pipeline;
 } rndr = { 0, NULL, NULL };
 
 struct RenderNode {
@@ -58,7 +58,7 @@ struct RenderNode {
 	union {
 		struct Sprite *sprite;
 		struct Text *text;
-		struct Widget *widget;
+		struct Image *image;
 	};
 };
 
@@ -138,7 +138,7 @@ init_text_pipeline(void)
 }
 
 static int
-init_widget_pipeline(void)
+init_image_pipeline(void)
 {
 	// load and compile the shader
 	const char *uniform_names[] = {
@@ -149,24 +149,24 @@ init_widget_pipeline(void)
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
-		&rndr.widget_pipeline.u_texture,
-		&rndr.widget_pipeline.u_size,
-		&rndr.widget_pipeline.u_border,
-		&rndr.widget_pipeline.u_transform,
+		&rndr.image_pipeline.u_texture,
+		&rndr.image_pipeline.u_size,
+		&rndr.image_pipeline.u_border,
+		&rndr.image_pipeline.u_transform,
 		NULL
 	};
-	rndr.widget_pipeline.shader = shader_compile(
-		"data/shaders/widget.vert",
-		"data/shaders/widget.frag",
+	rndr.image_pipeline.shader = shader_compile(
+		"data/shaders/image.vert",
+		"data/shaders/image.frag",
 		uniform_names,
 		uniforms,
 		NULL,
 		NULL
 	);
-	if (!rndr.widget_pipeline.shader) {
+	if (!rndr.image_pipeline.shader) {
 		fprintf(
 			stderr,
-			"failed to initialize widget pipeline\n"
+			"failed to initialize image pipeline\n"
 		);
 		return 0;
 	}
@@ -253,7 +253,7 @@ renderer_init(unsigned width, unsigned height)
 	rndr.initialized = (
 		init_sprite_pipeline() &&
 		init_text_pipeline() &&
-		init_widget_pipeline()
+		init_image_pipeline()
 	);
 
 	if (!rndr.initialized) {
@@ -445,42 +445,42 @@ render_text_node(const struct RenderNode *node)
 }
 
 void
-render_list_add_widget(
+render_list_add_image(
 	struct RenderList *list,
-	const struct Widget *wdg,
+	const struct Image *img,
 	float x,
 	float y
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_WIDGET;
-	node->widget = (struct Widget*)wdg;
+	node->image = (struct Image*)img;
 	mat_ident(&node->transform);
 	mat_translate(&node->transform, x - rndr.width / 2, -y + rndr.height / 2, 0);
 }
 
 static int
-render_widget_node(const struct RenderNode *node)
+render_image_node(const struct RenderNode *node)
 {
 	int ok = 1;
 
 	// configure size
-	Vec size = {{ node->widget->width, node->widget->height, 0, 0 }};
+	Vec size = {{ node->image->width, node->image->height, 0, 0 }};
 	ok &= shader_uniform_set(
-		&rndr.widget_pipeline.u_size,
+		&rndr.image_pipeline.u_size,
 		1,
 		&size
 	);
 
 	// configure border
 	Vec border = {{
-		node->widget->border.left,
-		node->widget->border.right,
-		node->widget->border.top,
-		node->widget->border.bottom
+		node->image->border.left,
+		node->image->border.right,
+		node->image->border.top,
+		node->image->border.bottom
 	}};
 	ok &= shader_uniform_set(
-		&rndr.widget_pipeline.u_border,
+		&rndr.image_pipeline.u_border,
 		1,
 		&border
 	);
@@ -489,7 +489,7 @@ render_widget_node(const struct RenderNode *node)
 	Mat mvp;
 	mat_mul(&rndr.projection, &node->transform, &mvp);
 	ok &= shader_uniform_set(
-		&rndr.widget_pipeline.u_transform,
+		&rndr.image_pipeline.u_transform,
 		1,
 		&mvp
 	);
@@ -497,15 +497,15 @@ render_widget_node(const struct RenderNode *node)
 	// configure texture sampler
 	GLuint texture_unit = WIDGET_TEXTURE_UNIT;
 	ok &= shader_uniform_set(
-		&rndr.widget_pipeline.u_texture,
+		&rndr.image_pipeline.u_texture,
 		1,
 		&texture_unit
 	);
 
 	// render
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
-	glBindTexture(GL_TEXTURE_RECTANGLE, node->widget->texture->hnd);
-	glBindVertexArray(node->widget->vao);
+	glBindTexture(GL_TEXTURE_RECTANGLE, node->image->texture->hnd);
+	glBindVertexArray(node->image->vao);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	ok &= glGetError() == GL_NO_ERROR;
 
@@ -549,9 +549,9 @@ render_list_exec(struct RenderList *list)
 			break;
 		case RENDER_NODE_WIDGET:
 			if (active != node->type) {
-				ok &= shader_bind(rndr.widget_pipeline.shader);
+				ok &= shader_bind(rndr.image_pipeline.shader);
 			}
-			ok &= render_widget_node(node);
+			ok &= render_image_node(node);
 			break;
 		}
 		active = node->type;

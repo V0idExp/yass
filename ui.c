@@ -1,11 +1,11 @@
 #include "font.h"
 #include "game.h"
+#include "image.h"
 #include "layout.h"
 #include "renderer.h"
 #include "state.h"
 #include "text.h"
 #include "texture.h"
-#include "widget.h"
 
 struct Button {
 	int (*on_click)(void);
@@ -28,10 +28,10 @@ static struct Text *text_fps = NULL;
 static struct Text *text_render_time = NULL;
 static struct Text *text_credits = NULL;
 
-static struct Widget *hp_bar = NULL;
-static struct Widget *hp_bar_bg = NULL;
-static struct Widget *upgrades_win = NULL;
-static struct Widget *upgrades_weapon_frame = NULL;
+static struct Image *hp_bar = NULL;
+static struct Image *hp_bar_bg = NULL;
+static struct Image *upgrades_win = NULL;
+static struct Image *upgrades_weapon_frame = NULL;
 
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_bg = NULL;
@@ -99,7 +99,7 @@ static const struct {
 		.width = 200,
 		.height = 26
 	},
-	// credits text widget
+	// credits text image
 	{
 		.var = &e_text_credits,
 		.parent = &e_root,
@@ -112,7 +112,7 @@ static const struct {
 		},
 		.width = 150
 	},
-	// FPS text widget
+	// FPS text image
 	{
 		.var = &e_text_fps,
 		.parent = &e_hp_bar,
@@ -124,7 +124,7 @@ static const struct {
 			.top = 10
 		}
 	},
-	// render time text widget
+	// render time text image
 	{
 		.var = &e_text_render_time,
 		.parent = &e_text_fps,
@@ -225,7 +225,7 @@ ui_init(void)
 	update_credits(0);
 
 	// HP bar
-	hp_bar = widget_new();
+	hp_bar = image_new();
 	if (!hp_bar) {
 		return 0;
 	}
@@ -233,7 +233,7 @@ ui_init(void)
 	hp_bar->border.left = 6;
 	hp_bar->border.right = 6;
 
-	hp_bar_bg = widget_new();
+	hp_bar_bg = image_new();
 	if (!hp_bar_bg) {
 		return 0;
 	}
@@ -242,7 +242,7 @@ ui_init(void)
 	hp_bar_bg->border.right = 6;
 
 	// upgrade shop window
-	upgrades_win = widget_new();
+	upgrades_win = image_new();
 	if (!upgrades_win) {
 		return 0;
 	}
@@ -253,7 +253,7 @@ ui_init(void)
 	upgrades_win->border.bottom = 13;
 
 	// upgrade shop weapon section frame
-	upgrades_weapon_frame = widget_new();
+	upgrades_weapon_frame = image_new();
 	upgrades_weapon_frame->texture = tex_frame;
 	upgrades_weapon_frame->border.left = 7;
 	upgrades_weapon_frame->border.right = 7;
@@ -300,9 +300,9 @@ void
 ui_cleanup(void)
 {
 	element_destroy(e_root);
-	widget_destroy(upgrades_win);
-	widget_destroy(hp_bar_bg);
-	widget_destroy(hp_bar);
+	image_destroy(upgrades_win);
+	image_destroy(hp_bar_bg);
+	image_destroy(hp_bar);
 	text_destroy(text_fps);
 	text_destroy(text_render_time);
 	text_destroy(text_credits);
@@ -330,7 +330,7 @@ ui_update(const struct State *state, float dt)
 		first_update = 0;
 	}
 
-	// update performance widgets once per second
+	// update performance images once per second
 	static float time_acc = 0;
 	time_acc += dt;
 	if (time_acc >= 1.0) {
@@ -353,7 +353,7 @@ ui_update(const struct State *state, float dt)
 		update_credits(state->credits);
 	}
 
-	// update hitpoints widget
+	// update hitpoints image
 	if (prev_state.hitpoints != state->hitpoints) {
 		update_hitpoints(state->hitpoints);
 	}
@@ -366,7 +366,7 @@ ui_update(const struct State *state, float dt)
 		return 0;
 	}
 
-	// update widgets dimensions based on new layout metrics
+	// update images dimensions based on new layout metrics
 	hp_bar->height = e_hp_bar->height;
 	hp_bar_bg->width = e_hp_bar->width;
 	hp_bar_bg->height = e_hp_bar->height;
@@ -407,14 +407,14 @@ ui_render(struct RenderList *rndr_list)
 		e_text_credits->y
 	);
 
-	// render hitpoints widget
-	render_list_add_widget(
+	// render hitpoints image
+	render_list_add_image(
 		rndr_list,
 		hp_bar_bg,
 		e_hp_bar->x,
 		e_hp_bar->y
 	);
-	render_list_add_widget(
+	render_list_add_image(
 		rndr_list,
 		hp_bar,
 		e_hp_bar->x,
@@ -423,13 +423,13 @@ ui_render(struct RenderList *rndr_list)
 
 	// render upgrades shop window, if needed
 	if (ui_state.show_upgrades_win) {
-		render_list_add_widget(
+		render_list_add_image(
 			rndr_list,
 			upgrades_win,
 			e_upgrades_win->x,
 			e_upgrades_win->y
 		);
-		render_list_add_widget(
+		render_list_add_image(
 			rndr_list,
 			upgrades_weapon_frame,
 			e_upgrades_weapons_frame->x,

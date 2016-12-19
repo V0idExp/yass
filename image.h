@@ -3,7 +3,7 @@
 #include <GL/glew.h>
 #include <stddef.h>
 
-struct Widget {
+struct Image {
 	GLuint vao;
 	struct Texture *texture;
 	unsigned int width, height;
@@ -13,8 +13,8 @@ struct Widget {
 	} border;
 };
 
-struct Widget*
-widget_new(void);
+struct Image*
+image_new(void);
 
 void
-widget_destroy(struct Widget *widget);
+image_destroy(struct Image *image);
