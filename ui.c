@@ -31,10 +31,12 @@ static struct Text *text_credits = NULL;
 static struct Widget *hp_bar = NULL;
 static struct Widget *hp_bar_bg = NULL;
 static struct Widget *upgrades_win = NULL;
+static struct Widget *upgrades_weapon_frame = NULL;
 
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_bg = NULL;
 static struct Texture *tex_win = NULL;
+static struct Texture *tex_frame = NULL;
 
 // TEXTURES
 static const struct TextureRes {
@@ -44,6 +46,7 @@ static const struct TextureRes {
 	{ "data/art/UI/squareGreen.png", &tex_hp_bar_green },
 	{ "data/art/UI/squareRed.png", &tex_hp_bar_bg },
 	{ "data/art/UI/metalPanel_red.png", &tex_win },
+	{ "data/art/UI/metalPanel_plate.png", &tex_frame },
 	{ NULL }
 };
 
@@ -65,6 +68,7 @@ static struct Element *e_hp_bar = NULL;
 static struct Element *e_text_fps = NULL;
 static struct Element *e_text_render_time = NULL;
 static struct Element *e_upgrades_win = NULL;
+static struct Element *e_upgrades_weapons_frame = NULL;
 
 static const struct {
 	struct Element **var, **parent;
@@ -132,7 +136,7 @@ static const struct {
 			.top = 10
 		},
 	},
-	// upgrades shop window
+	// upgrades window
 	{
 		.var = &e_upgrades_win,
 		.parent = &e_root,
@@ -142,6 +146,22 @@ static const struct {
 		},
 		.width = 450,
 		.height = 450
+	},
+	// upgrades window - weapons frame
+	{
+		.var = &e_upgrades_weapons_frame,
+		.parent = &e_upgrades_win,
+		.anchors = {
+			.left = ANCHOR_LEFT,
+			.right = ANCHOR_RIGHT,
+			.top = ANCHOR_TOP,
+		},
+		.margins = {
+			.top = 32,
+			.left = 8,
+			.right = 8,
+		},
+		.height = 100
 	},
 	{
 		.var = NULL
@@ -231,6 +251,14 @@ ui_init(void)
 	upgrades_win->border.right = 11;
 	upgrades_win->border.top = 32;
 	upgrades_win->border.bottom = 13;
+
+	// upgrade shop weapon section frame
+	upgrades_weapon_frame = widget_new();
+	upgrades_weapon_frame->texture = tex_frame;
+	upgrades_weapon_frame->border.left = 7;
+	upgrades_weapon_frame->border.right = 7;
+	upgrades_weapon_frame->border.top = 7;
+	upgrades_weapon_frame->border.bottom = 7;
 
 	return 1;
 }
@@ -344,6 +372,8 @@ ui_update(const struct State *state, float dt)
 	hp_bar_bg->height = e_hp_bar->height;
 	upgrades_win->width = e_upgrades_win->width;
 	upgrades_win->height = e_upgrades_win->height;
+	upgrades_weapon_frame->width = e_upgrades_weapons_frame->width;
+	upgrades_weapon_frame->height = e_upgrades_weapons_frame->height;
 
 	prev_state = *state;
 
@@ -398,6 +428,12 @@ ui_render(struct RenderList *rndr_list)
 			upgrades_win,
 			e_upgrades_win->x,
 			e_upgrades_win->y
+		);
+		render_list_add_widget(
+			rndr_list,
+			upgrades_weapon_frame,
+			e_upgrades_weapons_frame->x,
+			e_upgrades_weapons_frame->y
 		);
 	}
 }
