@@ -1,6 +1,7 @@
 #include "font.h"
 #include "game.h"
 #include "layout.h"
+#include "matlib.h"
 #include "renderer.h"
 #include "state.h"
 #include "text.h"
@@ -16,10 +17,12 @@ static struct {
 /*** RESOURCES ***/
 static struct Font *font_dbg = NULL;
 static struct Font *font_hud = NULL;
+static struct Font *font_ui = NULL;
 
 static struct Text *text_fps = NULL;
 static struct Text *text_render_time = NULL;
 static struct Text *text_credits = NULL;
+static struct Text *text_upgrade_weapon = NULL;
 
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_red = NULL;
@@ -54,7 +57,7 @@ static const struct TextureRes {
 		{ 7, 7, 7, 7 }
 	},
 	{
-		"data/art/UI/buttonGreen.png",
+		"data/art/UI/buttonRed.png",
 		&tex_btn,
 		{ 6, 6, 6, 6 }
 	},
@@ -69,6 +72,7 @@ static const struct {
 } fonts[] = {
 	{ "data/fonts/courier.ttf", 16, &font_dbg },
 	{ "data/fonts/kenvector_future_thin.ttf", 16, &font_hud },
+	{ "data/fonts/kenvector_future_thin.ttf", 14, &font_ui },
 	{ NULL }
 };
 
@@ -82,10 +86,16 @@ enum {
 struct Widget {
 	int type;
 	struct Element *elem;
-	void *data;
 	float z;
 	int visible;
 	int (*on_click)(void);
+	union {
+		struct {
+			struct Text *text;
+			Vec color;
+		} text;
+		struct Texture *image;
+	};
 };
 
 static struct Widget w_root;
@@ -97,6 +107,7 @@ static struct Widget w_render_time;
 static struct Widget w_upgrades_win;
 static struct Widget w_upgrades_weapon_frame;
 static struct Widget w_upgrades_weapon_btn;
+static struct Widget w_upgrades_weapon_btn_label;
 
 // WIDGET EVENT HANDLERS
 static int
@@ -110,8 +121,14 @@ static const struct WidgetSpec {
 	struct Margins margins;
 	unsigned width, height;
 	int x, y, z;
-	void *data;
 	int (*on_click)(void);
+	union {
+		struct {
+			struct Text **text;
+			Vec color;
+		} text;
+		struct Texture **image;
+	};
 } layout[] = {
 	// root element (screen)
 	{
@@ -126,7 +143,7 @@ static const struct WidgetSpec {
 		.var = &w_hp_bar,
 		.parent = &w_root,
 		.type = WIDGET_IMAGE,
-		.data = &tex_hp_bar_green,
+		.image = &tex_hp_bar_green,
 		.anchors = {
 			.left = ANCHOR_LEFT,
 			.top = ANCHOR_TOP
@@ -144,7 +161,7 @@ static const struct WidgetSpec {
 		.var = &w_hp_bar_bg,
 		.parent = &w_hp_bar,
 		.type = WIDGET_IMAGE,
-		.data = &tex_hp_bar_red,
+		.image = &tex_hp_bar_red,
 		.anchors = {
 			.left = ANCHOR_LEFT,
 			.top = ANCHOR_TOP,
@@ -157,7 +174,10 @@ static const struct WidgetSpec {
 		.var = &w_fps,
 		.parent = &w_hp_bar,
 		.type = WIDGET_TEXT,
-		.data = &text_fps,
+		.text = {
+			.text = &text_fps,
+			.color = {{1.0, 1.0, 1.0, 1.0}}
+		},
 		.anchors = {
 			.top = ANCHOR_BOTTOM,
 			.left = ANCHOR_LEFT,
@@ -171,7 +191,10 @@ static const struct WidgetSpec {
 		.var = &w_render_time,
 		.parent = &w_fps,
 		.type = WIDGET_TEXT,
-		.data = &text_render_time,
+		.text = {
+			.text = &text_render_time,
+			.color = {{1.0, 1.0, 1.0, 1.0}}
+		},
 		.anchors = {
 			.top = ANCHOR_BOTTOM,
 			.left = ANCHOR_LEFT,
@@ -185,7 +208,10 @@ static const struct WidgetSpec {
 		.var = &w_credits,
 		.parent = &w_root,
 		.type = WIDGET_TEXT,
-		.data = &text_credits,
+		.text = {
+			.text = &text_credits,
+			.color = {{1.0, 1.0, 1.0, 1.0}}
+		},
 		.anchors = {
 			.top = ANCHOR_TOP,
 			.right = ANCHOR_RIGHT
@@ -200,7 +226,7 @@ static const struct WidgetSpec {
 		.var = &w_upgrades_win,
 		.parent = &w_root,
 		.type = WIDGET_IMAGE,
-		.data = &tex_win,
+		.image = &tex_win,
 		.anchors = {
 			.hcenter = ANCHOR_HCENTER,
 			.vcenter = ANCHOR_VCENTER
@@ -213,7 +239,7 @@ static const struct WidgetSpec {
 		.var = &w_upgrades_weapon_frame,
 		.parent = &w_upgrades_win,
 		.type = WIDGET_IMAGE,
-		.data = &tex_frame,
+		.image = &tex_frame,
 		.anchors = {
 			.left = ANCHOR_LEFT,
 			.right = ANCHOR_RIGHT,
@@ -232,18 +258,34 @@ static const struct WidgetSpec {
 		.var = &w_upgrades_weapon_btn,
 		.parent = &w_upgrades_weapon_frame,
 		.type = WIDGET_IMAGE,
-		.data = &tex_btn,
+		.image = &tex_btn,
 		.anchors = {
 			.right = ANCHOR_RIGHT,
-			.vcenter = ANCHOR_VCENTER,
+			.bottom = ANCHOR_BOTTOM,
 		},
 		.margins = {
 			.right = 8,
+			.bottom = 8
 		},
 		.width = 150,
 		.height = 39,
 		.z = 2,
 		.on_click = on_upgrade_weapon_btn_click
+	},
+	// upgrades window - weapon button label
+	{
+		.var = &w_upgrades_weapon_btn_label,
+		.parent = &w_upgrades_weapon_btn,
+		.type = WIDGET_TEXT,
+		.text = {
+			.text = &text_upgrade_weapon,
+			.color = {{1.0, 0.0, 0.0, 1.0}}
+		},
+		.anchors = {
+			.hcenter = ANCHOR_HCENTER,
+			.vcenter = ANCHOR_VCENTER,
+		},
+		.z = 3,
 	},
 	{
 		.var = NULL
@@ -298,19 +340,24 @@ ui_load(void)
 		if (!(*fonts[i].var = font_from_file(fonts[i].file, fonts[i].size))) {
 			fprintf(
 				stderr,
-				"failed to load font `%s`\n",
-				fonts[i].file
+				"failed to load font `%s` (%d)\n",
+				fonts[i].file,
+				fonts[i].size
 			);
 			return 0;
 		}
-		printf("loaded font `%s`\n", fonts[i].file);
+		printf("loaded font `%s` (%d)\n", fonts[i].file, fonts[i].size);
 	}
 
 	// create text renderables
 	text_fps = text_new(font_dbg);
 	text_render_time = text_new(font_dbg);
 	text_credits = text_new(font_hud);
-	if (!text_fps || !text_render_time || !text_credits) {
+	text_upgrade_weapon = text_new(font_ui);
+	if (!text_fps ||
+	    !text_render_time ||
+	    !text_credits ||
+	    !text_upgrade_weapon) {
 		return 0;
 	}
 
@@ -343,13 +390,26 @@ ui_load(void)
 		widget->visible = 1;
 		widget->type = spec.type;
 		widget->elem = elem;
-		widget->data = spec.data;
 		widget->z = spec.z;
 		widget->on_click = spec.on_click;
+
+		switch (widget->type) {
+		case WIDGET_TEXT:
+			widget->text.text = *spec.text.text;
+			widget->text.color = spec.text.color;
+			break;
+		case WIDGET_IMAGE:
+			widget->image = *spec.image;
+			break;
+		}
 	}
 
 	update_credits(0);
 	update_hitpoints(0);
+
+	text_set_string(text_upgrade_weapon, "Buy upgrade");
+	w_upgrades_weapon_btn_label.elem->width = text_upgrade_weapon->width;
+	w_upgrades_weapon_btn_label.elem->height = text_upgrade_weapon->height;
 
 	printf("UI initialized\n");
 
@@ -359,6 +419,12 @@ ui_load(void)
 void
 ui_cleanup(void)
 {
+	// destroy text objects
+	text_destroy(text_fps);
+	text_destroy(text_render_time);
+	text_destroy(text_credits);
+	text_destroy(text_upgrade_weapon);
+
 	// destroy all layout trees
 	for (unsigned i = 0; layout[i].var; i++) {
 		struct Widget *w = layout[i].var;
@@ -414,6 +480,7 @@ ui_update(const struct State *state, float dt)
 		w_upgrades_win.visible =
 		w_upgrades_weapon_frame.visible =
 		w_upgrades_weapon_btn.visible =
+		w_upgrades_weapon_btn_label.visible =
 		ui_state.show_upgrades_win
 	);
 
@@ -440,16 +507,17 @@ ui_render(struct RenderList *rndr_list)
 		case WIDGET_TEXT:
 			render_list_add_text(
 				rndr_list,
-				*(struct Text**)w->data,
+				w->text.text,
 				w->elem->x,
 				w->elem->y,
-				w->z
+				w->z,
+				w->text.color
 			);
 			break;
 		case WIDGET_IMAGE:
 			render_list_add_image(
 				rndr_list,
-				*(struct Texture**)w->data,
+				w->image,
 				w->elem->x,
 				w->elem->y,
 				w->z,

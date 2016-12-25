@@ -46,7 +46,8 @@ render_list_add_text(
 	const struct Text *txt,
 	float x,
 	float y,
-	float z
+	float z,
+	Vec color
 );
 
 /**

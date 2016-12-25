@@ -41,6 +41,7 @@ static struct Renderer {
 		struct ShaderUniform u_glyph_texture;
 		struct ShaderUniform u_atlas_texture;
 		struct ShaderUniform u_atlas_offset;
+		struct ShaderUniform u_color;
 	} text_pipeline;
 	struct {
 		GLuint image_vao;
@@ -58,7 +59,10 @@ struct RenderNode {
 	float z;
 	union {
 		struct Sprite *sprite;
-		struct Text *text;
+		struct {
+			struct Text *text;
+			Vec color;
+		} text;
 		struct {
 			struct Texture *tex;
 			float x, y, w, h;
@@ -114,6 +118,7 @@ init_text_pipeline(void)
 		"atlas_tex",
 		"atlas_offset",
 		"transform",
+		"color",
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
@@ -121,6 +126,7 @@ init_text_pipeline(void)
 		&rndr.text_pipeline.u_atlas_texture,
 		&rndr.text_pipeline.u_atlas_offset,
 		&rndr.text_pipeline.u_transform,
+		&rndr.text_pipeline.u_color,
 		NULL
 	};
 	rndr.text_pipeline.shader = shader_compile(
@@ -399,13 +405,15 @@ render_list_add_text(
 	const struct Text *txt,
 	float x,
 	float y,
-	float z
+	float z,
+	Vec color
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_TEXT;
 	node->z = z;
-	node->text = (struct Text*)txt;
+	node->text.text = (struct Text*)txt;
+	node->text.color = color;
 	mat_ident(&node->transform);
 	mat_translate(
 		&node->transform,
@@ -419,6 +427,8 @@ static int
 render_text_node(const struct RenderNode *node)
 {
 	int ok = 1;
+	struct Text *text = node->text.text;
+	struct Font *font = text->font;
 
 	// configure transform
 	Mat mvp;
@@ -429,8 +439,15 @@ render_text_node(const struct RenderNode *node)
 		&mvp
 	);
 
+	// configure color
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_color,
+		1,
+		&node->text.color
+	);
+
 	// configure atlas offset
-	unsigned int offset = font_get_atlas_offset(node->text->font);
+	unsigned int offset = font_get_atlas_offset(font);
 	ok &= shader_uniform_set(
 		&rndr.text_pipeline.u_atlas_offset,
 		1,
@@ -455,15 +472,15 @@ render_text_node(const struct RenderNode *node)
 	glActiveTexture(GL_TEXTURE0 + atlas_texture_unit);
 	glBindTexture(
 		GL_TEXTURE_RECTANGLE,
-		font_get_atlas_texture(node->text->font)
+		font_get_atlas_texture(font)
 	);
 	glActiveTexture(GL_TEXTURE0 + glyph_texture_unit);
 	glBindTexture(
 		GL_TEXTURE_1D,
-		font_get_glyph_texture(node->text->font)
+		font_get_glyph_texture(font)
 	);
-	glBindVertexArray(node->text->vao);
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, node->text->len);
+	glBindVertexArray(text->vao);
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, text->len);
 
 	ok &= glGetError() == GL_NO_ERROR;
 
