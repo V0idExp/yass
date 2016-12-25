@@ -490,9 +490,9 @@ ui_update(const struct State *state, float dt)
 	);
 
 	if (ui_state.show_upgrades_win) {
-		// enable or disable weapon upgrade button
+		// toggle weapon upgrade button
 		int enabled = state->credits >= WEAPON_UPGRADE_COST;
-		float opacity = enabled ? 1.0 : 0.3;
+		float opacity = enabled ? 1.0 : 0.5;
 		(
 			w_upgrades_weapon_btn.enabled =
 			w_upgrades_weapon_btn_label.enabled =
