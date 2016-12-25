@@ -17,10 +17,11 @@ element_new(unsigned width, unsigned height)
 	return elem;
 }
 
-static void
+static int
 destroy_elem_list_op(void *data, void *userdata)
 {
 	element_destroy(data);
+	return 1;
 }
 
 void
@@ -184,11 +185,11 @@ compute_position(struct Element *elem)
 	return 1;
 }
 
-static void
+static int
 compute_elem_layout_op(void *data, void *userdata)
 {
 	int *ok = userdata;
-	*ok &= element_compute_layout(data);
+	return (*ok &= element_compute_layout(data));
 }
 
 int
@@ -217,4 +218,38 @@ void
 element_remove_child(struct Element *elem, struct Element *child)
 {
 	list_remove(elem->children, child, ptr_cmp);
+}
+
+struct TraverseContext {
+	int (*func)(struct Element *e, void *userdata);
+	void *userdata;
+};
+
+static int
+traverse_elem_op(void *data, void *userdata)
+{
+	struct Element *elem = data;
+	struct TraverseContext *traverse = userdata;
+	return element_traverse(
+		elem,
+		traverse->func,
+		traverse->userdata
+	);
+}
+
+int
+element_traverse(
+	struct Element *elem,
+	int (*func)(struct Element *e, void *userdata),
+	void *userdata
+) {
+	if (!func(elem, userdata)) {
+		return 0;
+	}
+	struct TraverseContext traverse = {
+		.func = func,
+		.userdata = userdata,
+	};
+	list_foreach(elem->children, traverse_elem_op, &traverse);
+	return 1;
 }

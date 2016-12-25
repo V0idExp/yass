@@ -385,6 +385,7 @@ ui_load(void)
 		elem->y = spec.y;
 		elem->width = spec.width;
 		elem->height = spec.height;
+		elem->userdata = widget;
 
 		// initialize widget
 		widget->visible = 1;
@@ -528,38 +529,38 @@ ui_render(struct RenderList *rndr_list)
 		}
 	}
 }
-/*
-static int
-dispatch_click(struct Button *buttons, unsigned count, int x, int y)
-{
-	for (size_t i = 0; i < count; i++) {
-		int x1 = buttons[i].x, x2 = buttons[i].x + buttons[i].w;
-		int y1 = buttons[i].y, y2 = buttons[i].y + buttons[i].h;
 
-		if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
-			if (!buttons[i].on_click()) {
-				return 0;
-			}
-		}
+struct ClickContext {
+	int x, y;
+	int ok;
+};
+
+static int
+dispatch_click(struct Element *elem, void *userdata)
+{
+	struct ClickContext *ctx = userdata;
+	struct Widget *widget = elem->userdata;
+	int x = ctx->x, y = ctx->y;
+	int x1 = elem->x, x2 = elem->x + elem->width;
+	int y1 = elem->y, y2 = elem->y + elem->height;
+	if (widget->visible &&
+	    widget->on_click &&
+	    x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+		return (ctx->ok = widget->on_click());
 	}
 	return 1;
 }
-*/
 
 int
 ui_handle_click(int x, int y)
 {
-	/*
-	if (ui_state.show_upgrades_win) {
-		return dispatch_click(
-			upgrades_win_buttons,
-			sizeof(upgrades_win_buttons) / sizeof(struct Button),
-			x,
-			y
-		);
-	}
-	*/
-	return 1;
+	struct ClickContext ctx = {
+		.x = x,
+		.y = y,
+		.ok = 1
+	};
+	element_traverse(w_root.elem, dispatch_click, &ctx);
+	return ctx.ok;
 }
 
 static int

@@ -94,7 +94,9 @@ list_foreach(struct List *list, OpFunc op, void *userdata)
 	assert(list != NULL);
 	struct ListNode *node = list->head;
 	while (node) {
-		op(node->data, userdata);
+		if (!op(node->data, userdata)) {
+			break;
+		}
 		node = node->next;
 	}
 }

@@ -2,7 +2,7 @@
 
 typedef int (*CompareFunc)(const void *a, const void *b);
 typedef int (*FilterFunc)(void *data, void *userdata);
-typedef void (*OpFunc)(void *data, void *userdata);
+typedef int (*OpFunc)(void *data, void *userdata);
 
 struct List {
 	unsigned long len;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "matlib.h"
 #include <GL/glew.h>
 #include <SDL.h>
 

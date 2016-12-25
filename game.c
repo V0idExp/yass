@@ -155,7 +155,7 @@ error:
 	return NULL;
 }
 
-static void
+static int
 destroy_entity(void *entity_ptr, void *type)
 {
 	switch ((long)type) {
@@ -169,6 +169,7 @@ destroy_entity(void *entity_ptr, void *type)
 		asteroid_destroy(entity_ptr);
 		break;
 	}
+	return 1;
 }
 
 void
@@ -303,12 +304,13 @@ update_projectile(void *prj_ptr, void *ctx_ptr)
 	return 1;
 }
 
-static void
+static int
 scroll_entity(void *entity_ptr, void *ctx_ptr)
 {
 	struct Entity *entity = entity_ptr;
 	struct UpdateContext *ctx = ctx_ptr;
 	entity->y = entity->body.y += SCROLL_SPEED * ctx->dt;
+	return 1;
 }
 
 int

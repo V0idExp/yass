@@ -26,6 +26,8 @@ struct Element {
 	unsigned width, height;
 	int x, y;
 
+	void *userdata;
+
 	// read-only
 	struct Element *parent;
 	struct List *children;
@@ -39,6 +41,13 @@ element_destroy(struct Element *elem);
 
 int
 element_compute_layout(struct Element *elem);
+
+int
+element_traverse(
+	struct Element *elem,
+	int (*func)(struct Element *e, void *userdata),
+	void *userdata
+);
 
 int
 element_add_child(struct Element *elem, struct Element *child);
