@@ -1,6 +1,5 @@
 #include "error.h"
 #include "font.h"
-#include "image.h"
 #include "matlib.h"
 #include "memory.h"
 #include "renderer.h"
@@ -16,12 +15,12 @@
 #define SPRITE_TEXTURE_UNIT 0
 #define TEXT_GLYPH_TEXTURE_UNIT 1
 #define TEXT_ATLAS_TEXTURE_UNIT 2
-#define WIDGET_TEXTURE_UNIT 3
+#define IMAGE_TEXTURE_UNIT 3
 
 enum {
 	RENDER_NODE_SPRITE,
 	RENDER_NODE_TEXT,
-	RENDER_NODE_WIDGET,
+	RENDER_NODE_IMAGE,
 };
 
 static struct Renderer {
@@ -44,6 +43,7 @@ static struct Renderer {
 		struct ShaderUniform u_atlas_offset;
 	} text_pipeline;
 	struct {
+		GLuint image_vao;
 		struct Shader *shader;
 		struct ShaderUniform u_texture;
 		struct ShaderUniform u_size;
@@ -55,10 +55,14 @@ static struct Renderer {
 struct RenderNode {
 	int type;
 	Mat transform;
+	float z;
 	union {
 		struct Sprite *sprite;
 		struct Text *text;
-		struct Image *image;
+		struct {
+			struct Texture *tex;
+			float x, y, w, h;
+		} image;
 	};
 };
 
@@ -170,6 +174,16 @@ init_image_pipeline(void)
 		);
 		return 0;
 	}
+
+	// create a dummy VAO for images rendering
+	glGenVertexArrays(1, &rndr.image_pipeline.image_vao);
+	if (glGetError() != GL_NO_ERROR || !rndr.image_pipeline.image_vao) {
+		fprintf(
+			stderr,
+			"failed to initialize image VAO\n"
+		);
+		return 0;
+	}
 	return 1;
 }
 
@@ -271,6 +285,9 @@ void
 renderer_shutdown(void)
 {
 	shader_free(rndr.sprite_pipeline.shader);
+	shader_free(rndr.text_pipeline.shader);
+	shader_free(rndr.image_pipeline.shader);
+	glDeleteVertexArrays(1, &rndr.image_pipeline.image_vao);
 
 	if (rndr.ctx) {
 		SDL_GL_DeleteContext(rndr.ctx);
@@ -313,6 +330,7 @@ render_list_add_sprite(
 	const struct Sprite *spr,
 	float x,
 	float y,
+	float z,
 	float angle
 ) {
 	assert(list->len < RENDER_LIST_MAX_LEN);
@@ -320,6 +338,7 @@ render_list_add_sprite(
 	// initialize sprite render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_SPRITE;
+	node->z = z;
 	node->sprite = (struct Sprite*)spr;
 
 	// compute transform
@@ -379,14 +398,21 @@ render_list_add_text(
 	struct RenderList *list,
 	const struct Text *txt,
 	float x,
-	float y
+	float y,
+	float z
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_TEXT;
+	node->z = z;
 	node->text = (struct Text*)txt;
 	mat_ident(&node->transform);
-	mat_translate(&node->transform, x - rndr.width / 2, -y + rndr.height / 2, 0);
+	mat_translate(
+		&node->transform,
+		x - rndr.width / 2,
+		-y + rndr.height / 2,
+		0.0f
+	);
 }
 
 static int
@@ -447,16 +473,27 @@ render_text_node(const struct RenderNode *node)
 void
 render_list_add_image(
 	struct RenderList *list,
-	const struct Image *img,
+	const struct Texture *tex,
 	float x,
-	float y
+	float y,
+	float z,
+	float w,
+	float h
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
-	node->type = RENDER_NODE_WIDGET;
-	node->image = (struct Image*)img;
+	node->type = RENDER_NODE_IMAGE;
+	node->z = z;
+	node->image.tex = (struct Texture*)tex;
+	node->image.w = w;
+	node->image.h = h;
 	mat_ident(&node->transform);
-	mat_translate(&node->transform, x - rndr.width / 2, -y + rndr.height / 2, 0);
+	mat_translate(
+		&node->transform,
+		x - rndr.width / 2,
+		-y + rndr.height / 2,
+		0.0f
+	);
 }
 
 static int
@@ -465,7 +502,7 @@ render_image_node(const struct RenderNode *node)
 	int ok = 1;
 
 	// configure size
-	Vec size = {{ node->image->width, node->image->height, 0, 0 }};
+	Vec size = {{ node->image.w, node->image.h, 0, 0 }};
 	ok &= shader_uniform_set(
 		&rndr.image_pipeline.u_size,
 		1,
@@ -474,10 +511,10 @@ render_image_node(const struct RenderNode *node)
 
 	// configure border
 	Vec border = {{
-		node->image->border.left,
-		node->image->border.right,
-		node->image->border.top,
-		node->image->border.bottom
+		node->image.tex->border.left,
+		node->image.tex->border.right,
+		node->image.tex->border.top,
+		node->image.tex->border.bottom
 	}};
 	ok &= shader_uniform_set(
 		&rndr.image_pipeline.u_border,
@@ -495,7 +532,7 @@ render_image_node(const struct RenderNode *node)
 	);
 
 	// configure texture sampler
-	GLuint texture_unit = WIDGET_TEXTURE_UNIT;
+	GLuint texture_unit = IMAGE_TEXTURE_UNIT;
 	ok &= shader_uniform_set(
 		&rndr.image_pipeline.u_texture,
 		1,
@@ -504,8 +541,8 @@ render_image_node(const struct RenderNode *node)
 
 	// render
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
-	glBindTexture(GL_TEXTURE_RECTANGLE, node->image->texture->hnd);
-	glBindVertexArray(node->image->vao);
+	glBindTexture(GL_TEXTURE_RECTANGLE, node->image.tex->hnd);
+	glBindVertexArray(rndr.image_pipeline.image_vao);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	ok &= glGetError() == GL_NO_ERROR;
 
@@ -513,9 +550,14 @@ render_image_node(const struct RenderNode *node)
 }
 
 static int
-node_cmp(const void *a, const void *b)
+node_cmp(const void *a_ptr, const void *b_ptr)
 {
-	if (((struct RenderNode*)a)->type == ((struct RenderNode*)b)->type) {
+	const struct RenderNode *a = a_ptr, *b = b_ptr;
+	if (a->z < b->z) {
+		return -1;
+	} else if (a->z > b->z) {
+		return 1;
+	} else if (a->type == b->type) {
 		return 0;
 	} else if (a < b) {
 		return -1;
@@ -547,7 +589,7 @@ render_list_exec(struct RenderList *list)
 			}
 			ok &= render_text_node(node);
 			break;
-		case RENDER_NODE_WIDGET:
+		case RENDER_NODE_IMAGE:
 			if (active != node->type) {
 				ok &= shader_bind(rndr.image_pipeline.shader);
 			}

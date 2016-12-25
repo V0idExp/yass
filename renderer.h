@@ -5,7 +5,7 @@
 
 struct Sprite;
 struct Text;
-struct Image;
+struct Texture;
 
 /**
  * Render list.
@@ -33,6 +33,7 @@ render_list_add_sprite(
 	const struct Sprite *spr,
 	float x,
 	float y,
+	float z,
 	float angle
 );
 
@@ -44,7 +45,8 @@ render_list_add_text(
 	struct RenderList *list,
 	const struct Text *txt,
 	float x,
-	float y
+	float y,
+	float z
 );
 
 /**
@@ -53,9 +55,12 @@ render_list_add_text(
 void
 render_list_add_image(
 	struct RenderList *list,
-	const struct Image *img,
+	const struct Texture *tex,
 	float x,
-	float y
+	float y,
+	float z,
+	float w,
+	float h
 );
 
 /**
