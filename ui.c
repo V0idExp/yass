@@ -23,6 +23,7 @@ static struct Text *text_fps = NULL;
 static struct Text *text_render_time = NULL;
 static struct Text *text_credits = NULL;
 static struct Text *text_upgrade_weapon = NULL;
+static struct Text *text_upgrade_weapon_cost = NULL;
 
 static struct Texture *tex_hp_bar_green = NULL;
 static struct Texture *tex_hp_bar_red = NULL;
@@ -110,6 +111,7 @@ static struct Widget w_upgrades_win;
 static struct Widget w_upgrades_weapon_frame;
 static struct Widget w_upgrades_weapon_btn;
 static struct Widget w_upgrades_weapon_btn_label;
+static struct Widget w_upgrades_weapon_cost_label;
 
 // WIDGET EVENT HANDLERS
 static int
@@ -290,6 +292,24 @@ static const struct WidgetSpec {
 		.z = 3,
 	},
 	{
+		.var = &w_upgrades_weapon_cost_label,
+		.parent = &w_upgrades_weapon_frame,
+		.type = WIDGET_TEXT,
+		.text = {
+			.text = &text_upgrade_weapon_cost,
+			.color = {{0.4, 0.4, 0.4, 1.0}}
+		},
+		.anchors = {
+			.left = ANCHOR_LEFT,
+			.bottom = ANCHOR_BOTTOM
+		},
+		.margins = {
+			.left = 8,
+			.bottom = 22
+		},
+		.z = 3
+	},
+	{
 		.var = NULL
 	}
 };
@@ -356,10 +376,12 @@ ui_load(void)
 	text_render_time = text_new(font_dbg);
 	text_credits = text_new(font_hud);
 	text_upgrade_weapon = text_new(font_ui);
+	text_upgrade_weapon_cost = text_new(font_ui);
 	if (!text_fps ||
 	    !text_render_time ||
 	    !text_credits ||
-	    !text_upgrade_weapon) {
+	    !text_upgrade_weapon ||
+	    !text_upgrade_weapon_cost) {
 		return 0;
 	}
 
@@ -416,6 +438,14 @@ ui_load(void)
 	w_upgrades_weapon_btn_label.elem->width = text_upgrade_weapon->width;
 	w_upgrades_weapon_btn_label.elem->height = text_upgrade_weapon->height;
 
+	text_set_fmt(
+		text_upgrade_weapon_cost,
+		"Cost: %d$",
+		WEAPON_UPGRADE_COST
+	);
+	w_upgrades_weapon_cost_label.elem->width = text_upgrade_weapon_cost->width;
+	w_upgrades_weapon_cost_label.elem->height = text_upgrade_weapon_cost->height;
+
 	printf("UI initialized\n");
 
 	return 1;
@@ -429,6 +459,7 @@ ui_cleanup(void)
 	text_destroy(text_render_time);
 	text_destroy(text_credits);
 	text_destroy(text_upgrade_weapon);
+	text_destroy(text_upgrade_weapon_cost);
 
 	// destroy all layout trees
 	for (unsigned i = 0; layout[i].var; i++) {
@@ -486,6 +517,7 @@ ui_update(const struct State *state, float dt)
 		w_upgrades_weapon_frame.visible =
 		w_upgrades_weapon_btn.visible =
 		w_upgrades_weapon_btn_label.visible =
+		w_upgrades_weapon_cost_label.visible =
 		ui_state.show_upgrades_win
 	);
 

@@ -24,7 +24,7 @@
 #define PLAYER_ACTION_SHOOT_RATE 2.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400.0f  // units/second
 
-#define WEAPON_UPGRADE_COST 100
+#define WEAPON_UPGRADE_COST 250
 
 /**
  * Player action bits.
