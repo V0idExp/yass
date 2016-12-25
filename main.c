@@ -77,7 +77,8 @@ render_world(struct RenderList *rndr_list, struct World *world)
 		world->player.x,
 		world->player.y,
 		0.0f,
-		0.0f
+		0.0f,
+		1.0f
 	);
 
 	struct ListNode *ast_node = world->asteroid_list->head;
@@ -89,7 +90,8 @@ render_world(struct RenderList *rndr_list, struct World *world)
 			ast->x,
 			ast->y,
 			0.0f,
-			ast->rot
+			ast->rot,
+			1.0f
 		);
 		ast_node = ast_node->next;
 	}
@@ -104,7 +106,8 @@ render_world(struct RenderList *rndr_list, struct World *world)
 				prj->x,
 				prj->y,
 				-0.1f,
-				0
+				0,
+				1.0f
 			);
 		}
 		prj_node = prj_node->next;
@@ -119,7 +122,8 @@ render_world(struct RenderList *rndr_list, struct World *world)
 			enemy->x,
 			enemy->y,
 			0.0f,
-			0
+			0,
+			1.0f
 		);
 		enemy_node = enemy_node->next;
 	}

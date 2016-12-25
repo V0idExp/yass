@@ -88,6 +88,8 @@ struct Widget {
 	struct Element *elem;
 	float z;
 	int visible;
+	int enabled;
+	float opacity;
 	int (*on_click)(void);
 	union {
 		struct {
@@ -393,6 +395,8 @@ ui_load(void)
 		widget->elem = elem;
 		widget->z = spec.z;
 		widget->on_click = spec.on_click;
+		widget->opacity = 1.0;
+		widget->enabled = 1;
 
 		switch (widget->type) {
 		case WIDGET_TEXT:
@@ -485,6 +489,22 @@ ui_update(const struct State *state, float dt)
 		ui_state.show_upgrades_win
 	);
 
+	if (ui_state.show_upgrades_win) {
+		// enable or disable weapon upgrade button
+		int enabled = state->credits >= WEAPON_UPGRADE_COST;
+		float opacity = enabled ? 1.0 : 0.3;
+		(
+			w_upgrades_weapon_btn.enabled =
+			w_upgrades_weapon_btn_label.enabled =
+			enabled
+		);
+		(
+			w_upgrades_weapon_btn.opacity =
+			w_upgrades_weapon_btn_label.opacity =
+			opacity
+		);
+	}
+
 	// compute the new layout
 	if (!element_compute_layout(w_root.elem)) {
 		return 0;
@@ -512,7 +532,8 @@ ui_render(struct RenderList *rndr_list)
 				w->elem->x,
 				w->elem->y,
 				w->z,
-				w->text.color
+				w->text.color,
+				w->opacity
 			);
 			break;
 		case WIDGET_IMAGE:
@@ -523,7 +544,8 @@ ui_render(struct RenderList *rndr_list)
 				w->elem->y,
 				w->z,
 				w->elem->width,
-				w->elem->height
+				w->elem->height,
+				w->opacity
 			);
 			break;
 		}
@@ -543,7 +565,8 @@ dispatch_click(struct Element *elem, void *userdata)
 	int x = ctx->x, y = ctx->y;
 	int x1 = elem->x, x2 = elem->x + elem->width;
 	int y1 = elem->y, y2 = elem->y + elem->height;
-	if (widget->visible &&
+	if (widget->enabled &&
+	    widget->visible &&
 	    widget->on_click &&
 	    x >= x1 && x <= x2 && y >= y1 && y <= y2) {
 		return (ctx->ok = widget->on_click());

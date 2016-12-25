@@ -35,7 +35,8 @@ render_list_add_sprite(
 	float x,
 	float y,
 	float z,
-	float angle
+	float angle,
+	float opacity
 );
 
 /**
@@ -48,7 +49,8 @@ render_list_add_text(
 	float x,
 	float y,
 	float z,
-	Vec color
+	Vec color,
+	float opacity
 );
 
 /**
@@ -62,7 +64,8 @@ render_list_add_image(
 	float y,
 	float z,
 	float w,
-	float h
+	float h,
+	float opacity
 );
 
 /**

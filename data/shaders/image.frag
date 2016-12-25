@@ -6,6 +6,7 @@ out vec4 out_color;
 uniform vec2 size;
 uniform uvec4 border;
 uniform sampler2DRect tex;
+uniform float opacity = 1.0;
 
 float
 clamp_coord(float v, float size, float texSize, uint lo, uint hi)
@@ -30,5 +31,5 @@ main()
 		clamp_coord(uv.x, size.x, texSize.x, border.r, border.g),
 		clamp_coord(uv.y, size.y, texSize.y, border.b, border.a)
 	);
-	out_color = texture(tex, norm_uv);
+	out_color = texture(tex, norm_uv) * opacity;
 }

@@ -34,6 +34,7 @@ static struct Renderer {
 		struct ShaderUniform u_texture;
 		struct ShaderUniform u_size;
 		struct ShaderUniform u_transform;
+		struct ShaderUniform u_opacity;
 	} sprite_pipeline;
 	struct {
 		struct Shader *shader;
@@ -42,6 +43,7 @@ static struct Renderer {
 		struct ShaderUniform u_atlas_texture;
 		struct ShaderUniform u_atlas_offset;
 		struct ShaderUniform u_color;
+		struct ShaderUniform u_opacity;
 	} text_pipeline;
 	struct {
 		GLuint image_vao;
@@ -50,6 +52,7 @@ static struct Renderer {
 		struct ShaderUniform u_size;
 		struct ShaderUniform u_border;
 		struct ShaderUniform u_transform;
+		struct ShaderUniform u_opacity;
 	} image_pipeline;
 } rndr = { 0, NULL, NULL };
 
@@ -57,6 +60,7 @@ struct RenderNode {
 	int type;
 	Mat transform;
 	float z;
+	float opacity;
 	union {
 		struct Sprite *sprite;
 		struct {
@@ -83,12 +87,14 @@ init_sprite_pipeline(void)
 		"tex",
 		"size",
 		"transform",
+		"opacity",
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
 		&rndr.sprite_pipeline.u_texture,
 		&rndr.sprite_pipeline.u_size,
 		&rndr.sprite_pipeline.u_transform,
+		&rndr.sprite_pipeline.u_opacity,
 		NULL
 	};
 	rndr.sprite_pipeline.shader = shader_compile(
@@ -119,6 +125,7 @@ init_text_pipeline(void)
 		"atlas_offset",
 		"transform",
 		"color",
+		"opacity",
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
@@ -127,6 +134,7 @@ init_text_pipeline(void)
 		&rndr.text_pipeline.u_atlas_offset,
 		&rndr.text_pipeline.u_transform,
 		&rndr.text_pipeline.u_color,
+		&rndr.text_pipeline.u_opacity,
 		NULL
 	};
 	rndr.text_pipeline.shader = shader_compile(
@@ -156,6 +164,7 @@ init_image_pipeline(void)
 		"size",
 		"border",
 		"transform",
+		"opacity",
 		NULL
 	};
 	struct ShaderUniform *uniforms[] = {
@@ -163,6 +172,7 @@ init_image_pipeline(void)
 		&rndr.image_pipeline.u_size,
 		&rndr.image_pipeline.u_border,
 		&rndr.image_pipeline.u_transform,
+		&rndr.image_pipeline.u_opacity,
 		NULL
 	};
 	rndr.image_pipeline.shader = shader_compile(
@@ -337,7 +347,8 @@ render_list_add_sprite(
 	float x,
 	float y,
 	float z,
-	float angle
+	float angle,
+	float opacity
 ) {
 	assert(list->len < RENDER_LIST_MAX_LEN);
 
@@ -345,6 +356,7 @@ render_list_add_sprite(
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_SPRITE;
 	node->z = z;
+	node->opacity = opacity;
 	node->sprite = (struct Sprite*)spr;
 
 	// compute transform
@@ -389,6 +401,13 @@ render_sprite_node(const struct RenderNode *node)
 		&texture_unit
 	);
 
+	// configure opacity
+	ok &= shader_uniform_set(
+		&rndr.sprite_pipeline.u_opacity,
+		1,
+		&node->opacity
+	);
+
 	// render
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
 	glBindTexture(GL_TEXTURE_RECTANGLE, node->sprite->texture->hnd);
@@ -406,12 +425,14 @@ render_list_add_text(
 	float x,
 	float y,
 	float z,
-	Vec color
+	Vec color,
+	float opacity
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_TEXT;
 	node->z = z;
+	node->opacity = opacity;
 	node->text.text = (struct Text*)txt;
 	node->text.color = color;
 	mat_ident(&node->transform);
@@ -444,6 +465,13 @@ render_text_node(const struct RenderNode *node)
 		&rndr.text_pipeline.u_color,
 		1,
 		&node->text.color
+	);
+
+	// configure opacity
+	ok &= shader_uniform_set(
+		&rndr.text_pipeline.u_opacity,
+		1,
+		&node->opacity
 	);
 
 	// configure atlas offset
@@ -495,12 +523,14 @@ render_list_add_image(
 	float y,
 	float z,
 	float w,
-	float h
+	float h,
+	float opacity
 ) {
 	// initialize text render node
 	struct RenderNode *node = &list->nodes[list->len++];
 	node->type = RENDER_NODE_IMAGE;
 	node->z = z;
+	node->opacity = opacity;
 	node->image.tex = (struct Texture*)tex;
 	node->image.w = w;
 	node->image.h = h;
@@ -556,6 +586,13 @@ render_image_node(const struct RenderNode *node)
 		&texture_unit
 	);
 
+	// configure opacity
+	ok &= shader_uniform_set(
+		&rndr.image_pipeline.u_opacity,
+		1,
+		&node->opacity
+	);
+
 	// render
 	glActiveTexture(GL_TEXTURE0 + texture_unit);
 	glBindTexture(GL_TEXTURE_RECTANGLE, node->image.tex->hnd);
@@ -593,6 +630,12 @@ render_list_exec(struct RenderList *list)
 	int active = -1;
 	for (size_t i = 0; i < list->len; i++) {
 		struct RenderNode *node = &list->nodes[i];
+
+		// skip completely transparent nodes
+		if (node->opacity <= 1e-3) {
+			continue;
+		}
+
 		switch (node->type) {
 		case RENDER_NODE_SPRITE:
 			if (active != node->type) {

@@ -3,6 +3,7 @@
 uniform sampler2DRect atlas_tex;
 uniform uint atlas_offset;
 uniform vec4 color;
+uniform float opacity = 1.0;
 
 flat in uint char;
 in vec2 uv;
@@ -12,5 +13,5 @@ void main()
 {
 	float s = uv.s + char * atlas_offset;
 	float t = uv.t;
-	out_color = color * vec4(texture(atlas_tex, vec2(s, t)).r);
+	out_color = color * vec4(texture(atlas_tex, vec2(s, t)).r) * opacity;
 }
