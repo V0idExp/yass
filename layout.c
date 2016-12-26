@@ -4,8 +4,28 @@
 #include "memory.h"
 #include "utils.h"
 
+Measure
+measure_pc(short pc)
+{
+	struct Measure m = {
+		.unit = MEASURE_UNIT_PC,
+		.value = pc
+	};
+	return m;
+}
+
+Measure
+measure_px(short px)
+{
+	struct Measure m = {
+		.unit = MEASURE_UNIT_PX,
+		.value = px
+	};
+	return m;
+}
+
 struct Element*
-element_new(unsigned width, unsigned height)
+element_new(Measure width, Measure height)
 {
 	struct Element *elem = make(struct Element);
 	if (!elem || !(elem->children = list_new())) {
@@ -86,17 +106,29 @@ get_anchor_pos(struct Element *elem, Anchor a)
 	case ANCHOR_TOP:
 		return elem->y;
 	case ANCHOR_BOTTOM:
-		return elem->y + elem->height;
+		return elem->y + elem->height.computed;
 	case ANCHOR_LEFT:
 		return elem->x;
 	case ANCHOR_RIGHT:
-		return elem->x + elem->width;
+		return elem->x + elem->width.computed;
 	case ANCHOR_HCENTER:
-		return elem->x + elem->width / 2;
+		return elem->x + elem->width.computed / 2;
 	case ANCHOR_VCENTER:
-		return elem->y + elem->height / 2;
+		return elem->y + elem->height.computed / 2;
 	}
 	return 0; // should be never reached
+}
+
+static int
+compute_measure(struct Element *elem, int horizontal, Measure m)
+{
+	switch (m.unit) {
+	case MEASURE_UNIT_PC:
+		return m.value / 100.f * (horizontal ? elem->width.computed : elem->height.computed);
+	case MEASURE_UNIT_PX:
+		return m.value;
+	}
+	return 0;
 }
 
 static int
@@ -106,34 +138,52 @@ compute_size(struct Element *elem)
 	if (elem->anchors.left && elem->anchors.right && elem->parent) {
 		int left = (
 			get_anchor_pos(elem->parent, elem->anchors.left) +
-			elem->margins.left
+			compute_measure(elem->parent, 1, elem->margins.left)
 		);
 		int right = (
 			get_anchor_pos(elem->parent, elem->anchors.right) -
-			elem->margins.right
+			compute_measure(elem->parent, 1, elem->margins.right)
 		);
 
 		if (left > right) {
 			return 0;
 		}
-		elem->width = right - left;
+		elem->width.computed = right - left;
+	} else if (elem->width.unit == MEASURE_UNIT_PX ||
+	           (elem->width.unit == MEASURE_UNIT_PC && elem->parent)) {
+		elem->width.computed = compute_measure(
+			elem->parent,
+			1,
+			elem->width
+		);
+	} else {
+		return 0;
 	}
 
 	// compute height
 	if (elem->anchors.top && elem->anchors.bottom && elem->parent) {
 		int top = (
 			get_anchor_pos(elem->parent, elem->anchors.top) +
-			elem->margins.top
+			compute_measure(elem->parent, 0, elem->margins.top)
 		);
 		int bottom = (
 			get_anchor_pos(elem->parent, elem->anchors.bottom) -
-			elem->margins.bottom
+			compute_measure(elem->parent, 0, elem->margins.bottom)
 		);
 
 		if (top > bottom) {
 			return 0;
 		}
-		elem->height = bottom - top;
+		elem->height.computed = (bottom - top);
+	} else if (elem->height.unit == MEASURE_UNIT_PX ||
+	           (elem->height.unit == MEASURE_UNIT_PC && elem->parent)) {
+		elem->height.computed = compute_measure(
+			elem->parent,
+			0,
+			elem->height
+		);
+	} else {
+		return 0;
 	}
 
 	return 1;
@@ -148,13 +198,24 @@ compute_position(struct Element *elem)
 		int offset = 0;
 		if (elem->anchors.left) {
 			a = elem->anchors.left;
-			offset = elem->margins.left;
+			offset = compute_measure(
+				elem->parent,
+				1,
+				elem->margins.left
+			);
 		} else if (elem->anchors.right) {
 			a = elem->anchors.right;
-			offset = -(elem->width + elem->margins.right);
+			offset = -(
+				elem->width.computed +
+				compute_measure(
+					elem->parent,
+					1,
+					elem->margins.right
+				)
+			);
 		} else if (elem->anchors.hcenter) {
 			a = elem->anchors.hcenter;
-			offset = -(int)elem->width / 2;
+			offset = -(int)elem->width.computed / 2;
 		}
 
 		if (a) {
@@ -168,13 +229,24 @@ compute_position(struct Element *elem)
 		int offset = 0;
 		if (elem->anchors.top) {
 			a = elem->anchors.top;
-			offset = elem->margins.top;
+			offset = compute_measure(
+				elem->parent,
+				0,
+				elem->margins.top
+			);
 		} else if (elem->anchors.bottom) {
 			a = elem->anchors.bottom;
-			offset = -(elem->height + elem->margins.bottom);
+			offset = -(
+				elem->height.computed +
+				compute_measure(
+					elem->parent,
+					0,
+					elem->margins.bottom
+				)
+			);
 		} else if (elem->anchors.vcenter) {
 			a = elem->anchors.vcenter;
-			offset = -(int)elem->height / 2;
+			offset = -(int)elem->height.computed / 2;
 		}
 
 		if (a) {

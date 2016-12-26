@@ -14,18 +14,41 @@ enum {
 
 typedef int8_t Anchor;
 
+enum {
+	MEASURE_UNIT_PX,
+	MEASURE_UNIT_PC
+};
+
+typedef struct Measure {
+	int unit : 2;
+	int value : 14;
+	int computed;
+} Measure;
+
+Measure
+measure_pc(short pc);
+
+Measure
+measure_px(short px);
+
 struct Element {
+	// element anchors
 	struct Anchors {
 		Anchor left, right, top, bottom, hcenter, vcenter;
 	} anchors;
 
+	// margins
 	struct Margins {
-		int left, right, top, bottom;
+		Measure left, right, top, bottom;
 	} margins;
 
-	unsigned width, height;
+	// size
+	Measure width, height;
+
+	// position
 	int x, y;
 
+	// unmanaged userdata pointer
 	void *userdata;
 
 	// read-only
@@ -34,7 +57,7 @@ struct Element {
 };
 
 struct Element*
-element_new(unsigned width, unsigned height);
+element_new(Measure width, Measure height);
 
 void
 element_destroy(struct Element *elem);

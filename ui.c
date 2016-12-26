@@ -16,17 +16,22 @@ static struct {
 
 /*** RESOURCES ***/
 static struct Font *font_dbg = NULL;
-static struct Font *font_hud = NULL;
-static struct Font *font_ui = NULL;
+static struct Font *font_ui_l = NULL;
+static struct Font *font_ui_m = NULL;
+static struct Font *font_ui_s = NULL;
+
 
 static struct Text *text_fps = NULL;
 static struct Text *text_render_time = NULL;
 static struct Text *text_credits = NULL;
-static struct Text *text_upgrade_weapon = NULL;
+static struct Text *text_upgrade_weapon_btn_label = NULL;
 static struct Text *text_upgrade_weapon_cost = NULL;
+static struct Text *text_upgrade_weapon_label = NULL;
 
-static struct Texture *tex_hp_bar_green = NULL;
-static struct Texture *tex_hp_bar_red = NULL;
+static struct Texture *tex_block_green = NULL;
+static struct Texture *tex_block_red = NULL;
+static struct Texture *tex_block_white = NULL;
+static struct Texture *tex_block_shadow = NULL;
 static struct Texture *tex_win = NULL;
 static struct Texture *tex_frame = NULL;
 static struct Texture *tex_btn = NULL;
@@ -39,12 +44,22 @@ static const struct TextureRes {
 } textures[] = {
 	{
 		"data/art/UI/squareGreen.png",
-		&tex_hp_bar_green,
+		&tex_block_green,
 		{ 6, 6 }
 	},
 	{
 		"data/art/UI/squareRed.png",
-		&tex_hp_bar_red,
+		&tex_block_red,
+		{ 6, 6 }
+	},
+	{
+		"data/art/UI/squareWhite.png",
+		&tex_block_white,
+		{ 6, 6 }
+	},
+	{
+		"data/art/UI/square_shadow.png",
+		&tex_block_shadow,
 		{ 6, 6 }
 	},
 	{
@@ -72,8 +87,9 @@ static const struct {
 	struct Font **var;
 } fonts[] = {
 	{ "data/fonts/courier.ttf", 16, &font_dbg },
-	{ "data/fonts/kenvector_future_thin.ttf", 16, &font_hud },
-	{ "data/fonts/kenvector_future_thin.ttf", 14, &font_ui },
+	{ "data/fonts/kenvector_future_thin.ttf", 19, &font_ui_l },
+	{ "data/fonts/kenvector_future_thin.ttf", 16, &font_ui_m },
+	{ "data/fonts/kenvector_future_thin.ttf", 14, &font_ui_s },
 	{ NULL }
 };
 
@@ -112,18 +128,20 @@ static struct Widget w_upgrades_weapon_frame;
 static struct Widget w_upgrades_weapon_btn;
 static struct Widget w_upgrades_weapon_btn_label;
 static struct Widget w_upgrades_weapon_cost_label;
+static struct Widget w_upgrades_weapon_label;
+static struct Widget w_upgrades_weapon_level[6];
 
 // WIDGET EVENT HANDLERS
 static int
 on_upgrade_weapon_btn_click(void);
 
 // UI LAYOUT SPEC
-static const struct WidgetSpec {
+static struct WidgetSpec {
 	struct Widget *var, *parent;
 	int type;
 	struct Anchors anchors;
 	struct Margins margins;
-	unsigned width, height;
+	Measure width, height;
 	int x, y, z;
 	int (*on_click)(void);
 	union {
@@ -133,210 +151,296 @@ static const struct WidgetSpec {
 		} text;
 		struct Texture **image;
 	};
-} layout[] = {
-	// root element (screen)
-	{
-		.var = &w_root,
-		.parent = NULL,
-		.type = WIDGET_CONTAINER,
-		.width = SCREEN_WIDTH,
-		.height = SCREEN_HEIGHT
-	},
-	// hitpoints bar
-	{
-		.var = &w_hp_bar,
-		.parent = &w_root,
-		.type = WIDGET_IMAGE,
-		.image = &tex_hp_bar_green,
-		.anchors = {
-			.left = ANCHOR_LEFT,
-			.top = ANCHOR_TOP
+} *layout;
+
+static int
+init_layout(void)
+{
+	struct WidgetSpec layout_template[] = {
+		// root element (screen)
+		{
+			.var = &w_root,
+			.parent = NULL,
+			.type = WIDGET_CONTAINER,
+			.width = measure_px(SCREEN_WIDTH),
+			.height = measure_px(SCREEN_HEIGHT)
 		},
-		.margins = {
-			.left = 20,
-			.top = 20
+		// hitpoints bar
+		{
+			.var = &w_hp_bar,
+			.parent = &w_root,
+			.type = WIDGET_IMAGE,
+			.image = &tex_block_green,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP
+			},
+			.margins = {
+				.left = measure_px(20),
+				.top = measure_px(20)
+			},
+			.width = measure_px(200),
+			.height = measure_px(26),
+			.z = 1.0
 		},
-		.width = 200,
-		.height = 26,
-		.z = 1.0
-	},
-	// hitpoints bar background
-	{
-		.var = &w_hp_bar_bg,
-		.parent = &w_hp_bar,
-		.type = WIDGET_IMAGE,
-		.image = &tex_hp_bar_red,
-		.anchors = {
-			.left = ANCHOR_LEFT,
-			.top = ANCHOR_TOP,
+		// hitpoints bar background
+		{
+			.var = &w_hp_bar_bg,
+			.parent = &w_hp_bar,
+			.type = WIDGET_IMAGE,
+			.image = &tex_block_red,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP,
+			},
+			.width = measure_px(200),
+			.height = measure_px(26)
 		},
-		.width = 200,
-		.height = 26
-	},
-	// FPS text
-	{
-		.var = &w_fps,
-		.parent = &w_hp_bar,
-		.type = WIDGET_TEXT,
-		.text = {
-			.text = &text_fps,
-			.color = {{1.0, 1.0, 1.0, 1.0}}
+		// FPS text
+		{
+			.var = &w_fps,
+			.parent = &w_hp_bar,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_fps,
+				.color = {{1.0, 1.0, 1.0, 1.0}}
+			},
+			.anchors = {
+				.top = ANCHOR_BOTTOM,
+				.left = ANCHOR_LEFT,
+			},
+			.margins = {
+				.top = measure_px(10)
+			}
 		},
-		.anchors = {
-			.top = ANCHOR_BOTTOM,
-			.left = ANCHOR_LEFT,
+		// render time text
+		{
+			.var = &w_render_time,
+			.parent = &w_fps,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_render_time,
+				.color = {{1.0, 1.0, 1.0, 1.0}}
+			},
+			.anchors = {
+				.top = ANCHOR_BOTTOM,
+				.left = ANCHOR_LEFT,
+			},
+			.margins = {
+				.top = measure_px(10)
+			},
 		},
-		.margins = {
-			.top = 10
+		// credits text
+		{
+			.var = &w_credits,
+			.parent = &w_root,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_credits,
+				.color = {{1.0, 1.0, 1.0, 1.0}}
+			},
+			.anchors = {
+				.top = ANCHOR_TOP,
+				.right = ANCHOR_RIGHT
+			},
+			.margins = {
+				.top = measure_px(27)
+			},
+			.width = measure_px(200)
+		},
+		// upgrades window
+		{
+			.var = &w_upgrades_win,
+			.parent = &w_root,
+			.type = WIDGET_IMAGE,
+			.image = &tex_win,
+			.anchors = {
+				.hcenter = ANCHOR_HCENTER,
+				.vcenter = ANCHOR_VCENTER
+			},
+			.width = measure_px(450),
+			.height = measure_px(450),
+		},
+		// upgrades window - weapons frame
+		{
+			.var = &w_upgrades_weapon_frame,
+			.parent = &w_upgrades_win,
+			.type = WIDGET_IMAGE,
+			.image = &tex_frame,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.right = ANCHOR_RIGHT,
+				.top = ANCHOR_TOP,
+			},
+			.margins = {
+				.top = measure_px(32),
+				.left = measure_px(8),
+				.right = measure_px(8),
+			},
+			.height = measure_px(130),
+			.z = 1,
+		},
+		// upgrades window - weapons button
+		{
+			.var = &w_upgrades_weapon_btn,
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_IMAGE,
+			.image = &tex_btn,
+			.anchors = {
+				.right = ANCHOR_RIGHT,
+				.bottom = ANCHOR_BOTTOM,
+			},
+			.margins = {
+				.right = measure_px(8),
+				.bottom = measure_px(8)
+			},
+			.width = measure_px(150),
+			.height = measure_px(39),
+			.z = 2,
+			.on_click = on_upgrade_weapon_btn_click
+		},
+		// upgrades window - weapon button label
+		{
+			.var = &w_upgrades_weapon_btn_label,
+			.parent = &w_upgrades_weapon_btn,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_upgrade_weapon_btn_label,
+				.color = {{1.0, 0.0, 0.0, 1.0}}
+			},
+			.anchors = {
+				.hcenter = ANCHOR_HCENTER,
+				.vcenter = ANCHOR_VCENTER,
+			},
+			.z = 3,
+		},
+		// upgrades window - weapon cost label
+		{
+			.var = &w_upgrades_weapon_cost_label,
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_upgrade_weapon_cost,
+				.color = {{0.4, 0.4, 0.4, 1.0}}
+			},
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.bottom = ANCHOR_BOTTOM
+			},
+			.margins = {
+				.left = measure_px(8),
+				.bottom = measure_px(22)
+			},
+			.z = 3
+		},
+		// upgrades window - weapon label
+		{
+			.var = &w_upgrades_weapon_label,
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_TEXT,
+			.text = {
+				.text = &text_upgrade_weapon_label,
+				.color = {{0.8, 0.4, 0.4, 1.0}}
+			},
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP
+			},
+			.margins = {
+				.left = measure_px(8),
+				.top = measure_px(8)
+			},
+			.z = 3
+		},
+		// upgrades window - weapon level widgets
+		{
+			.var = &w_upgrades_weapon_level[0],
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_IMAGE,
+			.image = &tex_block_white,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP,
+			},
+			.margins = {
+				.top = measure_px(35),
+				.left = measure_pc(2),
+			},
+			.width = measure_pc(30),
+			.height = measure_px(26),
+			.z = 3
+		},
+		{
+			.var = &w_upgrades_weapon_level[1],
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_IMAGE,
+			.image = &tex_block_shadow,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP,
+			},
+			.margins = {
+				.top = measure_px(35),
+				.left = measure_pc(35),
+			},
+			.width = measure_pc(30),
+			.height = measure_px(26),
+			.z = 3
+		},
+		{
+			.var = &w_upgrades_weapon_level[2],
+			.parent = &w_upgrades_weapon_frame,
+			.type = WIDGET_IMAGE,
+			.image = &tex_block_shadow,
+			.anchors = {
+				.left = ANCHOR_LEFT,
+				.top = ANCHOR_TOP,
+			},
+			.margins = {
+				.top = measure_px(35),
+				.left = measure_pc(68),
+			},
+			.width = measure_pc(30),
+			.height = measure_px(26),
+			.z = 3
+		},
+		{
+			.var = NULL
 		}
-	},
-	// render time text
-	{
-		.var = &w_render_time,
-		.parent = &w_fps,
-		.type = WIDGET_TEXT,
-		.text = {
-			.text = &text_render_time,
-			.color = {{1.0, 1.0, 1.0, 1.0}}
-		},
-		.anchors = {
-			.top = ANCHOR_BOTTOM,
-			.left = ANCHOR_LEFT,
-		},
-		.margins = {
-			.top = 10
-		},
-	},
-	// credits text
-	{
-		.var = &w_credits,
-		.parent = &w_root,
-		.type = WIDGET_TEXT,
-		.text = {
-			.text = &text_credits,
-			.color = {{1.0, 1.0, 1.0, 1.0}}
-		},
-		.anchors = {
-			.top = ANCHOR_TOP,
-			.right = ANCHOR_RIGHT
-		},
-		.margins = {
-			.top = 20
-		},
-		.width = 150
-	},
-	// upgrades window
-	{
-		.var = &w_upgrades_win,
-		.parent = &w_root,
-		.type = WIDGET_IMAGE,
-		.image = &tex_win,
-		.anchors = {
-			.hcenter = ANCHOR_HCENTER,
-			.vcenter = ANCHOR_VCENTER
-		},
-		.width = 450,
-		.height = 450,
-	},
-	// upgrades window - weapons frame
-	{
-		.var = &w_upgrades_weapon_frame,
-		.parent = &w_upgrades_win,
-		.type = WIDGET_IMAGE,
-		.image = &tex_frame,
-		.anchors = {
-			.left = ANCHOR_LEFT,
-			.right = ANCHOR_RIGHT,
-			.top = ANCHOR_TOP,
-		},
-		.margins = {
-			.top = 32,
-			.left = 8,
-			.right = 8,
-		},
-		.height = 100,
-		.z = 1,
-	},
-	// upgrades window - weapons button
-	{
-		.var = &w_upgrades_weapon_btn,
-		.parent = &w_upgrades_weapon_frame,
-		.type = WIDGET_IMAGE,
-		.image = &tex_btn,
-		.anchors = {
-			.right = ANCHOR_RIGHT,
-			.bottom = ANCHOR_BOTTOM,
-		},
-		.margins = {
-			.right = 8,
-			.bottom = 8
-		},
-		.width = 150,
-		.height = 39,
-		.z = 2,
-		.on_click = on_upgrade_weapon_btn_click
-	},
-	// upgrades window - weapon button label
-	{
-		.var = &w_upgrades_weapon_btn_label,
-		.parent = &w_upgrades_weapon_btn,
-		.type = WIDGET_TEXT,
-		.text = {
-			.text = &text_upgrade_weapon,
-			.color = {{1.0, 0.0, 0.0, 1.0}}
-		},
-		.anchors = {
-			.hcenter = ANCHOR_HCENTER,
-			.vcenter = ANCHOR_VCENTER,
-		},
-		.z = 3,
-	},
-	{
-		.var = &w_upgrades_weapon_cost_label,
-		.parent = &w_upgrades_weapon_frame,
-		.type = WIDGET_TEXT,
-		.text = {
-			.text = &text_upgrade_weapon_cost,
-			.color = {{0.4, 0.4, 0.4, 1.0}}
-		},
-		.anchors = {
-			.left = ANCHOR_LEFT,
-			.bottom = ANCHOR_BOTTOM
-		},
-		.margins = {
-			.left = 8,
-			.bottom = 22
-		},
-		.z = 3
-	},
-	{
-		.var = NULL
+	};
+	layout = malloc(sizeof(layout_template));
+	if (!layout) {
+		return 0;
 	}
+	memcpy(layout, layout_template, sizeof(layout_template));
+	return 1;
 };
 
 static void
 update_credits(int credits)
 {
 	text_set_fmt(text_credits, "Credits: %d$", credits);
-	w_credits.elem->height = text_credits->height;
+	w_credits.elem->height = measure_px(text_credits->height);
 }
 
 static void
 update_hitpoints(int hitpoints)
 {
-	w_hp_bar.elem->width = (200.0 * hitpoints / PLAYER_INITIAL_HITPOINTS);
+	w_hp_bar.elem->width = measure_px(
+		200.0 * hitpoints / PLAYER_INITIAL_HITPOINTS
+	);
 }
 
 static void
 update_stats(unsigned fps, unsigned render_time)
 {
 	text_set_fmt(text_fps, "FPS: %d", fps);
-	w_fps.elem->width = text_fps->width;
-	w_fps.elem->height = text_fps->height;
+	w_fps.elem->width = measure_px(text_fps->width);
+	w_fps.elem->height = measure_px(text_fps->height);
 
 	text_set_fmt(text_render_time, "Render time: %dms", render_time);
-	w_render_time.elem->width = text_render_time->width;
-	w_render_time.elem->height = text_render_time->height;
+	w_render_time.elem->width = measure_px(text_render_time->width);
+	w_render_time.elem->height = measure_px(text_render_time->height);
 }
 
 int
@@ -374,18 +478,23 @@ ui_load(void)
 	// create text renderables
 	text_fps = text_new(font_dbg);
 	text_render_time = text_new(font_dbg);
-	text_credits = text_new(font_hud);
-	text_upgrade_weapon = text_new(font_ui);
-	text_upgrade_weapon_cost = text_new(font_ui);
+	text_credits = text_new(font_ui_l);
+	text_upgrade_weapon_btn_label = text_new(font_ui_s);
+	text_upgrade_weapon_cost = text_new(font_ui_s);
+	text_upgrade_weapon_label = text_new(font_ui_l);
 	if (!text_fps ||
 	    !text_render_time ||
 	    !text_credits ||
-	    !text_upgrade_weapon ||
-	    !text_upgrade_weapon_cost) {
+	    !text_upgrade_weapon_btn_label ||
+	    !text_upgrade_weapon_cost ||
+	    !text_upgrade_weapon_label) {
 		return 0;
 	}
 
 	// initialize layout
+	if (!init_layout()) {
+		return 0;
+	}
 	for (size_t i = 0; layout[i].var != NULL; i++) {
 		const struct WidgetSpec spec = layout[i];
 		struct Widget *widget = spec.var;
@@ -434,17 +543,33 @@ ui_load(void)
 	update_credits(0);
 	update_hitpoints(0);
 
-	text_set_string(text_upgrade_weapon, "Buy upgrade");
-	w_upgrades_weapon_btn_label.elem->width = text_upgrade_weapon->width;
-	w_upgrades_weapon_btn_label.elem->height = text_upgrade_weapon->height;
+	text_set_string(text_upgrade_weapon_btn_label, "Buy upgrade");
+	w_upgrades_weapon_btn_label.elem->width = measure_px(
+		text_upgrade_weapon_btn_label->width
+	);
+	w_upgrades_weapon_btn_label.elem->height = measure_px(
+		text_upgrade_weapon_btn_label->height
+	);
 
 	text_set_fmt(
 		text_upgrade_weapon_cost,
 		"Cost: %d$",
 		WEAPON_UPGRADE_COST
 	);
-	w_upgrades_weapon_cost_label.elem->width = text_upgrade_weapon_cost->width;
-	w_upgrades_weapon_cost_label.elem->height = text_upgrade_weapon_cost->height;
+	w_upgrades_weapon_cost_label.elem->width = measure_px(
+		text_upgrade_weapon_cost->width
+	);
+	w_upgrades_weapon_cost_label.elem->height = measure_px(
+		text_upgrade_weapon_cost->height
+	);
+
+	text_set_string(text_upgrade_weapon_label, "Cannons: Level 1");
+	w_upgrades_weapon_label.elem->width = measure_px(
+		text_upgrade_weapon_label->width
+	);
+	w_upgrades_weapon_label.elem->height = measure_px(
+		text_upgrade_weapon_label->height
+	);
 
 	printf("UI initialized\n");
 
@@ -454,11 +579,13 @@ ui_load(void)
 void
 ui_cleanup(void)
 {
+	free(layout);
+
 	// destroy text objects
 	text_destroy(text_fps);
 	text_destroy(text_render_time);
 	text_destroy(text_credits);
-	text_destroy(text_upgrade_weapon);
+	text_destroy(text_upgrade_weapon_btn_label);
 	text_destroy(text_upgrade_weapon_cost);
 
 	// destroy all layout trees
@@ -518,6 +645,10 @@ ui_update(const struct State *state, float dt)
 		w_upgrades_weapon_btn.visible =
 		w_upgrades_weapon_btn_label.visible =
 		w_upgrades_weapon_cost_label.visible =
+		w_upgrades_weapon_label.visible =
+		w_upgrades_weapon_level[0].visible =
+		w_upgrades_weapon_level[1].visible =
+		w_upgrades_weapon_level[2].visible =
 		ui_state.show_upgrades_win
 	);
 
@@ -575,8 +706,8 @@ ui_render(struct RenderList *rndr_list)
 				w->elem->x,
 				w->elem->y,
 				w->z,
-				w->elem->width,
-				w->elem->height,
+				w->elem->width.computed,
+				w->elem->height.computed,
 				w->opacity
 			);
 			break;
@@ -595,8 +726,8 @@ dispatch_click(struct Element *elem, void *userdata)
 	struct ClickContext *ctx = userdata;
 	struct Widget *widget = elem->userdata;
 	int x = ctx->x, y = ctx->y;
-	int x1 = elem->x, x2 = elem->x + elem->width;
-	int y1 = elem->y, y2 = elem->y + elem->height;
+	int x1 = elem->x, x2 = elem->x + elem->width.computed;
+	int y1 = elem->y, y2 = elem->y + elem->height.computed;
 	if (widget->enabled &&
 	    widget->visible &&
 	    widget->on_click &&
