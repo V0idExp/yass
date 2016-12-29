@@ -17,30 +17,6 @@ struct Entity {
 };
 
 static int
-add_event(struct World *world, const struct Event *evt)
-{
-	// extend the event queue
-	if (world->event_count == world->event_queue_size) {
-		size_t new_size = world->event_queue_size + EVENT_QUEUE_BASE_SIZE;
-		void *new_queue = realloc(
-			world->event_queue,
-			sizeof(struct Event) * new_size
-		);
-		if (!new_queue) {
-			error(ERR_NO_MEM);
-			return 0;
-		}
-		world->event_queue = new_queue;
-		world->event_queue_size = new_size;
-	}
-
-	// append the event to the end of the queue
-	world->event_queue[world->event_count++] = *evt;
-
-	return 1;
-}
-
-static int
 handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 {
 	if (a->type == BODY_TYPE_PLAYER) {
@@ -52,7 +28,7 @@ handle_player_collision(struct Body *a, struct Body *b, void *userdata)
 			}
 		};
 		struct World *world = userdata;
-		return add_event(world, &evt);
+		return world_dispatch_event(world, &evt);
 	}
 	return 1;
 }
@@ -70,7 +46,7 @@ handle_enemy_hit(struct Body *a, struct Body *b, void *userdata)
 
 		};
 		struct World *world = userdata;
-		return add_event(world, &evt);
+		return world_dispatch_event(world, &evt);
 	}
 	return 1;
 }
@@ -246,7 +222,7 @@ update_enemy(void *enemy_ptr, void *ctx_ptr)
 	if (enemy->hitpoints <= 0) {
 		destroy = 1;
 		struct Event evt = { EVENT_ENEMY_KILL };
-		add_event(ctx->world, &evt);
+		world_dispatch_event(ctx->world, &evt);
 	} else if ((enemy->ttl -= ctx->dt) <= 0) {
 		destroy = 1;
 	}
@@ -363,6 +339,11 @@ world_update(struct World *world, float dt)
 			printf("enemy killed!\n");
 			plr->credits += ENEMY_CREDIT_YIELD;
 			break;
+		case EVENT_CANNONS_UPGRADE:
+			printf("cannons upgraded!\n");
+			plr->credits -= WEAPON_UPGRADE_COST;
+			plr->cannons_level++;
+			break;
 		}
 	}
 	// flush the event queue
@@ -415,6 +396,30 @@ world_update(struct World *world, float dt)
 	// scroll entities down
 	list_foreach(world->enemy_list, scroll_entity, &ctx);
 	list_foreach(world->asteroid_list, scroll_entity, &ctx);
+
+	return 1;
+}
+
+int
+world_dispatch_event(struct World *world, const struct Event *evt)
+{
+	// extend the event queue
+	if (world->event_count == world->event_queue_size) {
+		size_t new_size = world->event_queue_size + EVENT_QUEUE_BASE_SIZE;
+		void *new_queue = realloc(
+			world->event_queue,
+			sizeof(struct Event) * new_size
+		);
+		if (!new_queue) {
+			error(ERR_NO_MEM);
+			return 0;
+		}
+		world->event_queue = new_queue;
+		world->event_queue_size = new_size;
+	}
+
+	// append the event to the end of the queue
+	world->event_queue[world->event_count++] = *evt;
 
 	return 1;
 }

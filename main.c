@@ -160,14 +160,22 @@ handle_key(const SDL_Event *key_evt, struct World *world)
 	return 1;
 }
 
+int
+dispatch_event(const struct Event *evt, void *ctx)
+{
+	return world_dispatch_event(ctx, evt);
+}
+
 static int
-handle_mouse(const SDL_Event *mouse_evt)
+handle_mouse(const SDL_Event *mouse_evt, EventDispatchFunc dispatch, void *ctx)
 {
 	if (mouse_evt->button.button == SDL_BUTTON_LEFT &&
 	    mouse_evt->button.clicks == 1) {
 		return ui_handle_click(
 			mouse_evt->button.x,
-			mouse_evt->button.y
+			mouse_evt->button.y,
+			dispatch,
+			ctx
 		);
 	}
 	return 1;
@@ -244,7 +252,7 @@ main(int argc, char *argv[])
 			} else if (evt.type == SDL_QUIT) {
 				run = 0;
 			} else if (evt.type == SDL_MOUSEBUTTONUP) {
-				run &= handle_mouse(&evt);
+				run &= handle_mouse(&evt, dispatch_event, world);
 			}
 		}
 
@@ -264,6 +272,7 @@ main(int argc, char *argv[])
 			// update the state
 			state.credits = world->player.credits;
 			state.hitpoints = world->player.hitpoints;
+			state.cannons_level = world->player.cannons_level;
 		}
 
 		// update the UI

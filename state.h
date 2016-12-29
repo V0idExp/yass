@@ -6,6 +6,7 @@ struct State {
 
 	int credits;
 	int hitpoints;
+	int cannons_level;
 
 	int fps;
 	int render_time;

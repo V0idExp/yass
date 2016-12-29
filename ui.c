@@ -6,6 +6,7 @@
 #include "state.h"
 #include "text.h"
 #include "texture.h"
+#include "ui.h"
 
 /*** UI STATE ***/
 static struct {
@@ -107,7 +108,7 @@ struct Widget {
 	int visible;
 	int enabled;
 	float opacity;
-	int (*on_click)(void);
+	int (*on_click)(EventDispatchFunc dispatch, void *context);
 	union {
 		struct {
 			struct Text *text;
@@ -133,7 +134,7 @@ static struct Widget w_upgrades_weapon_level[6];
 
 // WIDGET EVENT HANDLERS
 static int
-on_upgrade_weapon_btn_click(void);
+on_upgrade_weapon_btn_click(EventDispatchFunc dispatch, void *context);
 
 // UI LAYOUT SPEC
 static struct WidgetSpec {
@@ -143,7 +144,7 @@ static struct WidgetSpec {
 	struct Margins margins;
 	Measure width, height;
 	int x, y, z;
-	int (*on_click)(void);
+	int (*on_click)(EventDispatchFunc dispatch, void *context);
 	union {
 		struct {
 			struct Text **text;
@@ -357,7 +358,7 @@ init_layout(void)
 			.var = &w_upgrades_weapon_level[0],
 			.parent = &w_upgrades_weapon_frame,
 			.type = WIDGET_IMAGE,
-			.image = &tex_block_white,
+			.image = &tex_block_shadow,
 			.anchors = {
 				.left = ANCHOR_LEFT,
 				.top = ANCHOR_TOP,
@@ -441,6 +442,28 @@ update_stats(unsigned fps, unsigned render_time)
 	text_set_fmt(text_render_time, "Render time: %dms", render_time);
 	w_render_time.elem->width = measure_px(text_render_time->width);
 	w_render_time.elem->height = measure_px(text_render_time->height);
+}
+
+static void
+update_upgrades_win(int cannons_level)
+{
+	text_set_fmt(
+		text_upgrade_weapon_label,
+		"Cannons: Level %d",
+		cannons_level
+	);
+	w_upgrades_weapon_label.elem->width = measure_px(
+		text_upgrade_weapon_label->width
+	);
+	w_upgrades_weapon_label.elem->height = measure_px(
+		text_upgrade_weapon_label->height
+	);
+
+	for (short i = 0; i < 3; i++) {
+		if (i + 1 <= cannons_level) {
+			w_upgrades_weapon_level[i].image = tex_block_white;
+		}
+	}
 }
 
 int
@@ -542,6 +565,7 @@ ui_load(void)
 
 	update_credits(0);
 	update_hitpoints(0);
+	update_upgrades_win(0);
 
 	text_set_string(text_upgrade_weapon_btn_label, "Buy upgrade");
 	w_upgrades_weapon_btn_label.elem->width = measure_px(
@@ -561,14 +585,6 @@ ui_load(void)
 	);
 	w_upgrades_weapon_cost_label.elem->height = measure_px(
 		text_upgrade_weapon_cost->height
-	);
-
-	text_set_string(text_upgrade_weapon_label, "Cannons: Level 1");
-	w_upgrades_weapon_label.elem->width = measure_px(
-		text_upgrade_weapon_label->width
-	);
-	w_upgrades_weapon_label.elem->height = measure_px(
-		text_upgrade_weapon_label->height
 	);
 
 	printf("UI initialized\n");
@@ -637,6 +653,10 @@ ui_update(const struct State *state, float dt)
 		update_hitpoints(state->hitpoints);
 	}
 
+	if (prev_state.cannons_level != state->cannons_level) {
+		update_upgrades_win(state->cannons_level);
+	}
+
 	// update local UI state
 	ui_state.show_upgrades_win = state->show_upgrades_shop;
 	(
@@ -678,7 +698,7 @@ ui_update(const struct State *state, float dt)
 	return 1;
 }
 
-void
+int
 ui_render(struct RenderList *rndr_list)
 {
 	for (unsigned i = 0; layout[i].var; i++) {
@@ -713,11 +733,14 @@ ui_render(struct RenderList *rndr_list)
 			break;
 		}
 	}
+	return 1;
 }
 
 struct ClickContext {
 	int x, y;
 	int ok;
+	EventDispatchFunc dispatch;
+	void *dispatch_context;
 };
 
 static int
@@ -732,26 +755,33 @@ dispatch_click(struct Element *elem, void *userdata)
 	    widget->visible &&
 	    widget->on_click &&
 	    x >= x1 && x <= x2 && y >= y1 && y <= y2) {
-		return (ctx->ok = widget->on_click());
+		return (ctx->ok = widget->on_click(
+			ctx->dispatch,
+			ctx->dispatch_context
+		));
 	}
 	return 1;
 }
 
 int
-ui_handle_click(int x, int y)
+ui_handle_click(int x, int y, EventDispatchFunc dispatch, void *context)
 {
 	struct ClickContext ctx = {
 		.x = x,
 		.y = y,
-		.ok = 1
+		.ok = 1,
+		.dispatch = dispatch,
+		.dispatch_context = context
 	};
 	element_traverse(w_root.elem, dispatch_click, &ctx);
 	return ctx.ok;
 }
 
 static int
-on_upgrade_weapon_btn_click(void)
+on_upgrade_weapon_btn_click(EventDispatchFunc dispatch, void *context)
 {
-	printf("hello world\n");
-	return 1;
+	struct Event evt = {
+		.type = EVENT_CANNONS_UPGRADE
+	};
+	return dispatch(&evt, context);
 }

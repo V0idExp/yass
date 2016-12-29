@@ -24,7 +24,7 @@
 #define PLAYER_ACTION_SHOOT_RATE 2.0  // projectiles/second
 #define PLAYER_PROJECTILE_INITIAL_SPEED 400.0f  // units/second
 
-#define WEAPON_UPGRADE_COST 250
+#define WEAPON_UPGRADE_COST 25
 
 /**
  * Player action bits.
@@ -53,6 +53,7 @@ enum {
 	EVENT_ENEMY_HIT,
 	EVENT_PLAYER_COLLISION,
 	EVENT_ENEMY_KILL,
+	EVENT_CANNONS_UPGRADE,
 };
 
 /**
@@ -66,6 +67,7 @@ struct Player {
 	int actions;
 	float speed;
 	float shoot_cooldown;
+	int cannons_level;
 };
 
 /**
@@ -174,6 +176,18 @@ world_add_projectile(struct World *world, struct Projectile *projectile);
  */
 int
 world_update(struct World *world, float dt);
+
+/**
+ * Process game events.
+ */
+int
+world_process_events(struct World *world);
+
+/**
+ * Dispatch a game event.
+ */
+int
+world_dispatch_event(struct World *world, const struct Event *evt);
 
 /**
  * Create an enemy.
